@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Banque — NUI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="pin-screen" class="pin hidden">
+    <h2>Connexion à votre compte</h2>
+    <input id="pinInput" type="password" maxlength="4" placeholder="Entrez votre PIN à 4 chiffres" />
+    <button id="pinSubmit">Valider</button>
+    <p id="pinError" class="error hidden">PIN incorrect</p>
+  </div>
+
+  <div id="app" class="hidden">
+    <header>
+      <h1>Banque</h1>
+      <button id="closeBtn" class="icon">✕</button>
+    </header>
+
+    <main>
+      <section class="balance-card">
+        <div>
+          <div class="label">Solde</div>
+          <div id="balance" class="balance">$0</div>
+        </div>
+        <div class="account-label" id="accountLabel">Compte: personnel</div>
+      </section>
+
+      <section class="actions">
+        <div class="action">
+          <input id="depositAmount" type="number" placeholder="Montant à déposer" min="1" />
+          <button id="depositBtn">Déposer</button>
+        </div>
+        <div class="action">
+          <input id="withdrawAmount" type="number" placeholder="Montant à retirer" min="1" />
+          <button id="withdrawBtn">Retirer</button>
+        </div>
+        <div class="action">
+          <input id="transferTarget" type="text" placeholder="ID destinataire" />
+          <input id="transferAmount" type="number" placeholder="Montant" min="1" />
+          <button id="transferBtn">Transférer</button>
+        </div>
+      </section>
+
+      <section class="history">
+        <h2>Historique</h2>
+        <ul id="historyList"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <small>Appuyez sur ESC pour fermer</small>
+    </footer>
+  </div>
+
+  <div id="loading">Chargement…</div>
+
+  <script src="script.js"></script>
+</body>
+</html>
