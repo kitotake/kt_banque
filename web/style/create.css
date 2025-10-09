@@ -1,0 +1,14 @@
+#createAccountScreen input {
+    width: 100%;
+    text-align: center;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border: none;
+  }
+  
+  #createAccountScreen button {
+    width: 100%;
+    margin-top: 10px;
+  }
+  

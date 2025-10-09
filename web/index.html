@@ -1,20 +1,24 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Banque — NUI</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KT Banque — Tableau de bord</title>
+  <link rel="stylesheet" href="style/main.css" />
+  <link rel="stylesheet" href="style/pin.css" />
+  <link rel="stylesheet" href="style/account.css" />
 </head>
 <body>
-  <div id="pin-screen" class="pin hidden">
+  <!-- Écran PIN -->
+  <div id="pin-screen" class="screen hidden">
     <h2>Connexion à votre compte</h2>
     <input id="pinInput" type="password" maxlength="4" placeholder="Entrez votre PIN à 4 chiffres" />
     <button id="pinSubmit">Valider</button>
     <p id="pinError" class="error hidden">PIN incorrect</p>
   </div>
 
-  <div id="app" class="hidden">
+  <!-- Dashboard principal -->
+  <div id="account-screen" class="screen hidden">
     <header>
       <h1>Banque</h1>
       <button id="closeBtn" class="icon">✕</button>
@@ -58,6 +62,8 @@
 
   <div id="loading">Chargement…</div>
 
-  <script src="script.js"></script>
+  <script src="js/pin.js"></script>
+  <script src="js/account.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

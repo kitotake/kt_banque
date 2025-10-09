@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Créer un compte — KT Banque</title>
+  <link rel="stylesheet" href="style/main.css" />
+  <link rel="stylesheet" href="style/create.css" />
+</head>
+<body>
+  <div id="create-screen" class="screen">
+    <h2>Créer votre compte bancaire</h2>
+    <input type="password" id="newPin" maxlength="4" placeholder="PIN (4 chiffres)" />
+    <button id="createBtn">Créer le compte</button>
+    <button id="cancelBtn" class="secondary">Annuler</button>
+    <p id="createError" class="error hidden">Erreur lors de la création</p>
+  </div>
+
+  <script src="js/create.js"></script>
+</body>
+</html>

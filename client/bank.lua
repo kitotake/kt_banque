@@ -1,9 +1,8 @@
--- client/bank.lua
 ESX = exports["es_extended"]:getSharedObject()
 local isUIOpen = false
-local currentCardMeta = nil -- { id = ..., account_id = ..., owner = ..., last4 = ... }
+local currentCardMeta = nil
 
--- créer blips
+-- Créer blips
 CreateThread(function()
     for _, blip in pairs(Config.Blips) do
         local b = AddBlipForCoord(blip.pos)
@@ -17,95 +16,143 @@ CreateThread(function()
     end
 end)
 
--- Serveur envoie payload pour ouvrir NUI
+-- Serveur ouvre NUI
 RegisterNetEvent("bank:client:openNUI", function(payload)
-    -- payload contient balance, label, history, card_meta {id, account_id, owner, last4}
     currentCardMeta = payload.card_meta or nil
-    -- n'envoyer aucune info sensible (PIN)
     SetNuiFocus(true, true)
-    SendNUIMessage({ action = "openPin", card = payload }) -- le web affichera l'écran PIN puis ouvrira l'UI
+    SendNUIMessage({ action = "openPin", card = payload })
     isUIOpen = true
 end)
 
--- serveur envoie update solde
 RegisterNetEvent("bank:client:updateBalance", function(balance)
     SendNUIMessage({ action = "updateBalance", balance = balance })
 end)
 
--- NUI close (appelé par web)
-RegisterNUICallback("close", function(data, cb)
+RegisterNUICallback("close", function(_, cb)
     SetNuiFocus(false, false)
     isUIOpen = false
     currentCardMeta = nil
     cb("ok")
 end)
 
--- NUI create account (create pin) -> forward to server
 RegisterNUICallback("createAccount", function(data, cb)
-    local pin = tostring(data.pin)
-    TriggerServerEvent("bank:server:createAccount", pin)
+    TriggerServerEvent("bank:server:createAccount", data)
     cb("ok")
 end)
 
--- NUI deposit -> send to server with pin & cardId
 RegisterNUICallback("deposit", function(data, cb)
     if not currentCardMeta or not currentCardMeta.id then
         cb("no_card")
         return
     end
-    TriggerServerEvent("bank:server:deposit", { amount = tonumber(data.amount), cardId = currentCardMeta.id, pin = tostring(data.pin) })
+    TriggerServerEvent("bank:server:deposit", {
+        amount = tonumber(data.amount),
+        cardId = currentCardMeta.id,
+        pin = tostring(data.pin)
+    })
     cb("ok")
 end)
 
--- NUI withdraw
 RegisterNUICallback("withdraw", function(data, cb)
     if not currentCardMeta or not currentCardMeta.id then
         cb("no_card")
         return
     end
-    TriggerServerEvent("bank:server:withdraw", { amount = tonumber(data.amount), cardId = currentCardMeta.id, pin = tostring(data.pin) })
+    TriggerServerEvent("bank:server:withdraw", {
+        amount = tonumber(data.amount),
+        cardId = currentCardMeta.id,
+        pin = tostring(data.pin)
+    })
     cb("ok")
 end)
 
--- NUI transfer
 RegisterNUICallback("transfer", function(data, cb)
     if not currentCardMeta or not currentCardMeta.id then
         cb("no_card")
         return
     end
-    TriggerServerEvent("bank:server:transfer", { amount = tonumber(data.amount), target = data.target, cardId = currentCardMeta.id, pin = tostring(data.pin) })
+    TriggerServerEvent("bank:server:transfer", {
+        amount = tonumber(data.amount),
+        target = data.target,
+        cardId = currentCardMeta.id,
+        pin = tostring(data.pin)
+    })
     cb("ok")
 end)
 
--- Interaction PNJ / ATM
+------------------------------------------
+-- 👇 Interaction PNJ + Menu ox_lib
+------------------------------------------
+local function openCardMenu()
+    -- Récupération de la valeur de l’argent (depuis ox_inventory)
+    local moneyItems = exports.ox_inventory:Search('count', 'money')
+    local playerMoney = moneyItems or 0
+
+    local options = {
+        {
+            title = "💳 Carte Basique",
+            description = "Gratuite. Limites faibles.\n• Dépôt max: $2000\n• Retrait max: $1000",
+            icon = "credit-card",
+            onSelect = function()
+                if playerMoney >= 0 then
+                    TriggerServerEvent('bank:server:createAccount', { pin = "0000", card_type = "carte_basique" })
+                else
+                    lib.notify({ title = "Erreur", description = "Argent insuffisant.", type = "error" })
+                end
+            end
+        },
+        {
+            title = "🏅 Carte Or",
+            description = "Frais: $2,500\nLimites élevées.\n• Dépôt max: $3500\n• Retrait max: $2000",
+            icon = "gem",
+            onSelect = function()
+                local price = 2500
+                if playerMoney >= price then
+                    TriggerServerEvent('bank:server:createAccount', { pin = "0000", card_type = "carte_or" })
+                    exports.ox_inventory:RemoveItem('money', price)
+                else
+                    lib.notify({ title = "Erreur", description = "Vous n'avez pas assez d'argent liquide ($2500).", type = "error" })
+                end
+            end
+        },
+        {
+            title = "💎 Carte Dimas",
+            description = "Frais: $5,000\nPrestige ultime.\n• Dépôt max: $4500\n• Retrait max: $2000",
+            icon = "crown",
+            onSelect = function()
+                local price = 5000
+                if playerMoney >= price then
+                    TriggerServerEvent('bank:server:createAccount', { pin = "0000", card_type = "carte_dimas" })
+                    exports.ox_inventory:RemoveItem('money', price)
+                else
+                    lib.notify({ title = "Erreur", description = "Vous n'avez pas assez d'argent liquide ($5000).", type = "error" })
+                end
+            end
+        },
+    }
+
+    lib.registerContext({
+        id = 'bank_card_selection',
+        title = 'Choisissez votre Carte Bancaire',
+        options = options
+    })
+    lib.showContext('bank_card_selection')
+end
+
+------------------------------------------
+-- 👇 Détection du PNJ
+------------------------------------------
 CreateThread(function()
     while true do
         Wait(500)
         local ped = PlayerPedId()
         local coords = GetEntityCoords(ped)
-        -- PNJ
         if Config.PNJ and Config.PNJ.Enabled then
             local d = #(coords - vector3(Config.PNJ.Coords.x, Config.PNJ.Coords.y, Config.PNJ.Coords.z))
             if d < 2.0 then
-                ESX.ShowHelpNotification("Appuyez sur ~INPUT_CONTEXT~ pour accéder à la ~g~Banque~s~.")
+                ESX.ShowHelpNotification("Appuyez sur ~INPUT_CONTEXT~ pour parler au banquier.")
                 if IsControlJustReleased(0, 38) then
-                    -- demande au serveur d'ouvrir (server vérifiera la carte)
-                    TriggerServerEvent("bank:server:requestOpen")
-                end
-            end
-        end
-
-        -- ATM detection (objets) - parcourt la liste
-        for _, model in ipairs(Config.ATMModels) do
-            local atmHash = GetHashKey(model)
-            local obj = GetClosestObjectOfType(coords, 1.5, atmHash, false, false, false)
-            if obj ~= 0 then
-                local d = #(coords - GetEntityCoords(obj))
-                if d < 1.5 then
-                    ESX.ShowHelpNotification("Appuyez sur ~INPUT_CONTEXT~ pour accéder à l'ATM.")
-                    if IsControlJustReleased(0, 38) then
-                        TriggerServerEvent("bank:server:requestOpen")
-                    end
+                    openCardMenu()
                 end
             end
         end

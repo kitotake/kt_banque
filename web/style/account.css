@@ -1,0 +1,22 @@
+#bankUI {
+    width: 320px;
+  }
+  
+  #balance {
+    margin-bottom: 15px;
+    font-size: 18px;
+  }
+  
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  #amount {
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+  }
+  

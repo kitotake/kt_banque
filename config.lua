@@ -20,7 +20,7 @@ Config.BankCardItem = {
 Config.PNJ = {
     Enabled = true,
     Model = "s_m_m_banker_01",
-    Coords = vector4(150.266, -1040.203, 29.374, 337.5),
+    Coords = vec3(254.054214, 222.734680, 105.531494),
 }
 
 -- Modèles ATM reconnus

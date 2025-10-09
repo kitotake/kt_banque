@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KT Banque — ATM</title>
+  <link rel="stylesheet" href="style/main.css" />
+  <link rel="stylesheet" href="style/account.css" />
+</head>
+<body>
+  <div id="atm-screen" class="screen">
+    <header>
+      <h1>Distributeur Automatique</h1>
+      <button id="closeAtmBtn" class="icon">✕</button>
+    </header>
+
+    <main>
+      <section class="atm-balance">
+        <div class="label">Solde disponible</div>
+        <div id="atmBalance" class="balance">$0</div>
+      </section>
+
+      <section class="limits">
+        <p><strong>Limite de dépôt:</strong> <span id="depositLimit">$0</span></p>
+        <p><strong>Limite de retrait:</strong> <span id="withdrawLimit">$0</span></p>
+      </section>
+
+      <section class="actions">
+        <div class="action">
+          <input id="atmDepositAmount" type="number" placeholder="Montant à déposer" min="1" />
+          <button id="atmDepositBtn">Déposer</button>
+        </div>
+        <div class="action">
+          <input id="atmWithdrawAmount" type="number" placeholder="Montant à retirer" min="1" />
+          <button id="atmWithdrawBtn">Retirer</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <small>Appuyez sur ESC pour fermer</small>
+    </footer>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
