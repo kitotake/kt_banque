@@ -1007,7 +1007,7 @@ RegisterCommand('bank:repair', function(source, args)
     if pendingCard and pendingCard[1] then
         TriggerClientEvent('ox_lib:notify', source, {
             type = 'info',
-            description = "ℹ️ Une carte pending existe déjà pour ce compte"
+            description = "Une carte pending existe déjà pour ce compte"
         })
         return
     end
