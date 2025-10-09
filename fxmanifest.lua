@@ -4,7 +4,7 @@ lua54 'yes'
 
 author 'Kitotake'
 description 'Système bancaire avancé avec cartes et NUI'
-version '5.1.0'
+version '5.3.0'
 
 shared_scripts {
     '@es_extended/imports.lua',
@@ -18,7 +18,7 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/bank.lua'
+    'server/bank.lua',
 }
 
 -- Page principale (point d'entrée unique)

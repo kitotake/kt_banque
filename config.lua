@@ -10,19 +10,19 @@ Config.BankCardItem = {
 -- Limites par type de carte
 Config.CardLimits = {
     carte_basique = { 
-        MaxDeposit = 2000, 
+        MaxDeposit = 2500, 
         MaxWithdraw = 1000,
-        Price = 0 
+        Price = 50 
     },
     carte_or = { 
-        MaxDeposit = 3500, 
-        MaxWithdraw = 2000,
-        Price = 2500 
+        MaxDeposit = 4500, 
+        MaxWithdraw = 3000,
+        Price = 12500 
     },
     carte_dimas = { 
-        MaxDeposit = 4500, 
-        MaxWithdraw = 2500,
-        Price = 5000 
+        MaxDeposit = 5500, 
+        MaxWithdraw = 4500,
+        Price = 45000 
     }
 }
 

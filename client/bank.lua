@@ -61,7 +61,7 @@ CreateThread(function()
             local coords = pnjConfig.Coords
             local heading = pnjConfig.Heading or 0.0
 
-            local ped = CreatePed(4, hash, coords.x, coords.y, coords.z + 1.0, heading, false, true)
+            local ped = CreatePed(4, hash, coords.x, coords.y, coords.z - 1.0, heading, false, true)
             if DoesEntityExist(ped) then
                 print(("✅ PNJ %d spawné avec succès !"):format(i))
                 SetEntityHeading(ped, heading)
@@ -69,7 +69,7 @@ CreateThread(function()
                 SetEntityInvincible(ped, pnjConfig.Invincible or true)
                 SetBlockingOfNonTemporaryEvents(ped, true)
 
-                if pnjConfig.Scenario then
+                if pnjConfig.Scenario and pnjConfig.Scenario ~= "" then
                     TaskStartScenarioInPlace(ped, pnjConfig.Scenario, 0, true)
                 end
             else
@@ -83,14 +83,8 @@ end)
 -- 💳 INTERFACE BANCAIRE (NUI)
 -----------------------------------
 RegisterCommand("openNUI", function()
-    SetNuiFocus(true, true)
-    SendNUIMessage({
-        action = "openBank",
-        data = payload
-    })
-    isUIOpen = true
+    TriggerServerEvent('bank:server:requestOpen')
 end)
-
 
 RegisterNetEvent("bank:client:openNUI", function(payload)
     if not payload then return end
@@ -113,6 +107,60 @@ RegisterNetEvent("bank:client:updateBalance", function(balance)
 end)
 
 -----------------------------------
+-- 🆕 EVENT: OUVRIR CRÉATION DE COMPTE
+-----------------------------------
+RegisterNetEvent('bank:client:openAccountCreation', function()
+    print("^2[CLIENT]^7 Ouverture interface création de compte")
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        action = "openCreate"
+    })
+    isUIOpen = true
+end)
+
+-----------------------------------
+-- 💳 EVENT: AFFICHER MENU ACHAT CARTE
+-----------------------------------
+RegisterNetEvent('bank:client:showCardPurchaseMenu', function(accountId)
+    print("^2[CLIENT]^7 Ouverture menu achat carte pour compte ID:", accountId)
+    
+    -- Créer le menu avec ox_lib
+    local options = {}
+    
+    for cardType, limits in pairs(Config.CardLimits) do
+        local cardNames = {
+            carte_basique = "💳 Carte Basique",
+            carte_or = "🏅 Carte Or",
+            carte_dimas = "💎 Carte Diamant"
+        }
+        
+        table.insert(options, {
+            title = cardNames[cardType] or cardType,
+            description = string.format("Dépôt max: $%s | Retrait max: $%s\nPrix: $%s", 
+                limits.MaxDeposit, 
+                limits.MaxWithdraw, 
+                limits.Price
+            ),
+            icon = cardType == 'carte_basique' and 'credit-card' or (cardType == 'carte_or' and 'star' or 'gem'),
+            onSelect = function()
+                TriggerServerEvent('bank:server:purchaseCard', {
+                    account_id = accountId,
+                    card_type = cardType
+                })
+            end
+        })
+    end
+    
+    lib.registerContext({
+        id = 'card_purchase_menu',
+        title = '🏦 Achat de Carte Bancaire',
+        options = options
+    })
+    
+    lib.showContext('card_purchase_menu')
+end)
+
+-----------------------------------
 -- 🔁 CALLBACKS NUI
 -----------------------------------
 RegisterNUICallback("close", function(_, cb)
@@ -128,7 +176,8 @@ RegisterNUICallback("createAccount", function(data, cb)
         lib.notify({ title = "Erreur", description = Config.Notifications.invalid_pin, type = "error" })
         return cb("invalid")
     end
-    TriggerServerEvent("bank:server:createAccount", data)
+    print("^3[NUI Callback]^7 Création compte avec PIN:", data.pin)
+    TriggerServerEvent("bank:server:createAccountOnly", data)
     cb("ok")
 end)
 
@@ -195,11 +244,13 @@ end)
 -----------------------------------
 -- PNJ1 - Achat de carte
 local function openCardPurchaseMenu()
+    print("^5[PNJ1]^7 Interaction détectée - Achat de carte")
     TriggerServerEvent('bank:server:checkPendingAccount')
 end
 
 -- PNJ2 - Ouverture de compte
 local function openAccountCreationMenu()
+    print("^5[PNJ2]^7 Interaction détectée - Création de compte")
     TriggerServerEvent('bank:server:checkExistingAccount')
 end
 
@@ -235,9 +286,7 @@ CreateThread(function()
                 sleep = 0
                 ESX.ShowHelpNotification("Appuyez sur ~INPUT_CONTEXT~ pour ouvrir un compte bancaire")
                 if IsControlJustReleased(0, 38) then
-                    print("PNJ2 interaction")
                     openAccountCreationMenu()
-                    print("OPEN")
                 end
             end
         end
@@ -253,6 +302,8 @@ CreateThread(function()
         local sleep = 500
         local ped = PlayerPedId()
         local coords = GetEntityCoords(ped)
+        nearATM = false
+        
         for _, model in pairs(Config.ATMModels) do
             local atm = GetClosestObjectOfType(coords.x, coords.y, coords.z, Config.ATMDistance, model, false, false, false)
             if DoesEntityExist(atm) then
@@ -266,8 +317,6 @@ CreateThread(function()
                         TriggerServerEvent('bank:server:requestOpen')
                     end
                     break
-                else
-                    nearATM = false
                 end
             end
         end
