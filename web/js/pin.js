@@ -1,26 +1,99 @@
-// nui/js/pin.js
-document.addEventListener("DOMContentLoaded", () => {
-  const pinInput = document.getElementById("pinInput");
-  const pinSubmit = document.getElementById("pinSubmit");
-  const pinError = document.getElementById("pinError");
+document.addEventListener('DOMContentLoaded', function() {
+  const pinInput = document.getElementById('pinInput');
+  const pinSubmit = document.getElementById('pinSubmit');
+  const pinCancel = document.getElementById('pinCancel');
+  const pinError = document.getElementById('pinError');
 
   if (!pinInput || !pinSubmit) return;
 
-  pinSubmit.addEventListener("click", () => {
+  // Focus automatique sur l'input PIN
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.target.id === 'pin-screen' && mutation.target.classList.contains('active')) {
+        setTimeout(() => {
+          pinInput.focus();
+          pinInput.value = '';
+          if (pinError) {
+            pinError.classList.add('hidden');
+          }
+        }, 100);
+      }
+    });
+  });
+
+  const pinScreen = document.getElementById('pin-screen');
+  if (pinScreen) {
+    observer.observe(pinScreen, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  }
+
+  // Valider le PIN
+  function validatePin() {
     const pin = pinInput.value.trim();
-    if (pin.length !== 4 || isNaN(pin)) {
-      pinError.textContent = "PIN invalide (4 chiffres)";
-      pinError.classList.remove("hidden");
+    
+    if (pin.length !== 4) {
+      showError('Le PIN doit contenir 4 chiffres');
+      return;
+    }
+    
+    if (isNaN(pin)) {
+      showError('Le PIN doit contenir uniquement des chiffres');
       return;
     }
 
-    // Envoie le PIN au client pour ouverture
-    fetch(`https://kt_banque/createAccount`, {
-      method: "POST",
-      body: JSON.stringify({ pin }),
-    });
+    // Envoyer au serveur pour validation
+    window.KTBanque.postNUI('validatePin', { pin: pin })
+      .then(() => {
+        // Le serveur gèrera l'ouverture de l'interface
+        hideError();
+      })
+      .catch(() => {
+        showError('Erreur de connexion');
+      });
+  }
 
-    document.getElementById("pin-screen").classList.add("hidden");
-    document.getElementById("account-screen").classList.remove("hidden");
+  // Afficher erreur
+  function showError(message) {
+    if (pinError) {
+      pinError.textContent = message;
+      pinError.classList.remove('hidden');
+      pinInput.classList.add('error-shake');
+      
+      setTimeout(() => {
+        pinInput.classList.remove('error-shake');
+      }, 500);
+    }
+  }
+
+  // Masquer erreur
+  function hideError() {
+    if (pinError) {
+      pinError.classList.add('hidden');
+    }
+  }
+
+  // Event listeners
+  pinSubmit.addEventListener('click', validatePin);
+
+  pinInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      validatePin();
+    }
   });
+
+  // Accepter uniquement les chiffres
+  pinInput.addEventListener('input', function(e) {
+    this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);
+    hideError();
+  });
+
+  // Bouton annuler
+  if (pinCancel) {
+    pinCancel.addEventListener('click', function() {
+      window.KTBanque.postNUI('close', {});
+      window.KTBanque.setUIVisible(false);
+    });
+  }
 });
