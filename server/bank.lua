@@ -2,7 +2,9 @@ ESX = exports["es_extended"]:getSharedObject()
 local oxmysql = exports.oxmysql
 local DB = Config.DB
 
--- Helpers pour requêtes synchrones
+-----------------------------------
+-- 🔧 HELPERS BASE DE DONNÉES
+-----------------------------------
 local function dbFetch(query, params)
     local p = promise.new()
     oxmysql:query(query, params or {}, function(result)
@@ -27,7 +29,9 @@ local function dbInsert(query, params)
     return Citizen.Await(p)
 end
 
--- Génération IBAN-like unique
+-----------------------------------
+-- 🔢 GÉNÉRATION IBAN-LIKE
+-----------------------------------
 local function generateIBANLike()
     local function randDigits(n)
         local s = ""
@@ -54,7 +58,9 @@ local function generateIBANLike()
     return "FR" .. tostring(math.random(10000000, 99999999))
 end
 
--- Génération numéro de carte unique
+-----------------------------------
+-- 💳 GÉNÉRATION NUMÉRO DE CARTE
+-----------------------------------
 local function generateCardNumber()
     for attempt = 1, 10 do
         local cardNum = string.format("%08d%04d", math.random(40000000, 49999999), math.random(1000, 9999))
@@ -70,7 +76,9 @@ local function generateCardNumber()
     return tostring(os.time()) .. tostring(math.random(1000, 9999))
 end
 
--- Récupérer carte depuis inventaire
+-----------------------------------
+-- 🔍 RÉCUPÉRATION DONNÉES
+-----------------------------------
 local function getCardFromInventory(source)
     for cardType, itemName in pairs(Config.BankCardItem) do
         local items = exports.ox_inventory:Search(source, 'slots', itemName)
@@ -88,7 +96,6 @@ local function getCardFromInventory(source)
     return nil
 end
 
--- Récupérer carte depuis DB
 local function getCardFromDB(cardId)
     if not cardId then return nil end
     
@@ -101,7 +108,6 @@ local function getCardFromDB(cardId)
     return nil
 end
 
--- Récupérer compte
 local function getAccount(accountId)
     if not accountId then return nil end
     
@@ -114,7 +120,9 @@ local function getAccount(accountId)
     return nil
 end
 
--- Insérer log
+-----------------------------------
+-- 📝 LOGS BANCAIRES
+-----------------------------------
 local function insertLog(accountId, action, amount, identifier, description)
     local query = string.format(
         "INSERT INTO %s (account_id, action, amount, identifier, description) VALUES (?, ?, ?, ?, ?)",
@@ -123,12 +131,16 @@ local function insertLog(accountId, action, amount, identifier, description)
     dbExecute(query, {accountId, action, amount or 0, identifier, description})
 end
 
--- Obtenir limites selon type de carte
+-----------------------------------
+-- 🎯 LIMITES PAR TYPE DE CARTE
+-----------------------------------
 local function getLimitsForCardType(cardType)
     return Config.CardLimits[cardType] or Config.CardLimits["carte_basique"]
 end
 
--- Valider PIN
+-----------------------------------
+-- 🔐 VALIDATION PIN
+-----------------------------------
 local function validatePinAndGetCard(cardId, pin)
     local card = getCardFromDB(cardId)
     if not card then
@@ -142,18 +154,94 @@ local function validatePinAndGetCard(cardId, pin)
     return card, nil
 end
 
+-----------------------------------
+-- 📋 EVENT: VÉRIFIER COMPTE EN ATTENTE (PNJ1)
+-----------------------------------
+RegisterNetEvent('bank:server:checkPendingAccount', function()
+    local src = source
+    local xPlayer = ESX.GetPlayerFromId(src)
+    if not xPlayer then return end
+    
+    -- Vérifier si le joueur a déjà une carte active
+    local cardItem = getCardFromInventory(src)
+    if cardItem then
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'info',
+            description = "Vous possédez déjà une carte bancaire"
+        })
+        return
+    end
+    
+    -- Chercher un compte sans carte active
+    local query = string.format(
+        "SELECT b.ID, b.label FROM %s b LEFT JOIN %s c ON b.ID = c.account_id AND c.active = 1 WHERE b.identifier = ? AND c.id IS NULL LIMIT 1",
+        DB.banking_table,
+        DB.bank_cards_table
+    )
+    local result = dbFetch(query, {xPlayer.identifier})
+    
+    if result and result[1] then
+        -- Compte trouvé sans carte active - proposer l'achat
+        TriggerClientEvent('bank:client:showCardPurchaseMenu', src, result[1].ID)
+    else
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = "❌ Vous devez d'abord créer un compte au guichet d'ouverture"
+        })
+    end
+end)
+
+-----------------------------------
+-- ✨ EVENT: VÉRIFIER CRÉATION DE COMPTE (PNJ2)
+-----------------------------------
+RegisterNetEvent('bank:server:checkExistingAccount', function()
+    local src = source
+    local xPlayer = ESX.GetPlayerFromId(src)
+
+    print(("^3[bank:server:checkExistingAccount]^7 → Appel reçu du joueur [src: %s]"):format(src))
+
+    if not xPlayer then
+        print(("^1[ERREUR]^7 Aucun joueur trouvé pour src %s !"):format(src))
+        return
+    end
+
+    print(("^2[xPlayer]^7 Trouvé → Nom: %s | Identifier: %s"):format(xPlayer.getName(), xPlayer.identifier or "nil"))
+
+    -- Vérifier si le joueur a déjà un compte
+    local query = string.format("SELECT ID FROM %s WHERE identifier = ? LIMIT 1", DB.banking_table)
+    print(("^4[SQL]^7 Exécution de la requête: %s"):format(query))
+
+    local result = dbFetch(query, {xPlayer.identifier})
+
+    if result and result[1] then
+        print(("^6[Résultat SQL]^7 Compte trouvé pour %s (ID: %s)"):format(xPlayer.identifier, result[1].ID))
+
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'info',
+            description = "ℹ️ Vous possédez déjà un compte bancaire"
+        })
+
+        print("^3[Action]^7 Notification envoyée au client → compte déjà existant.")
+        return
+    else
+        print(("^2[Résultat SQL]^7 Aucun compte trouvé pour %s"):format(xPlayer.identifier))
+    end
+
+    -- Ouvrir l'interface de création
+    TriggerClientEvent('bank:client:openAccountCreation', src)
+    print(("^5[Action]^7 Ouverture de l'interface de création de compte pour %s (src: %s)"):format(xPlayer.getName(), src))
+end)
 
 
-
-
--- Event: Créer un compte
-RegisterNetEvent('bank:server:createAccount', function(data)
+-----------------------------------
+-- 🆕 EVENT: CRÉER COMPTE UNIQUEMENT (SANS CARTE)
+-----------------------------------
+RegisterNetEvent('bank:server:createAccountOnly', function(data)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return end
     
     local pin = tostring(data.pin or "0000")
-    local chosenType = tostring(data.card_type or "carte_basique")
     
     -- Validation PIN
     if #pin ~= 4 or not tonumber(pin) then
@@ -164,30 +252,19 @@ RegisterNetEvent('bank:server:createAccount', function(data)
         return
     end
     
-    -- Vérifier si le joueur peut payer
-    local limits = Config.CardLimits[chosenType]
-    if not limits then
+    -- Vérifier si le joueur a déjà un compte
+    local checkQuery = string.format("SELECT ID FROM %s WHERE identifier = ? LIMIT 1", DB.banking_table)
+    local exists = dbFetch(checkQuery, {xPlayer.identifier})
+    
+    if exists and exists[1] then
         TriggerClientEvent('ox_lib:notify', src, {
             type = 'error',
-            description = "Type de carte invalide"
+            description = "❌ Vous possédez déjà un compte bancaire"
         })
         return
     end
     
-    local price = limits.Price or 0
-    if price > 0 then
-        local playerMoney = exports.ox_inventory:Search(src, 'count', 'money')
-        if playerMoney < price then
-            TriggerClientEvent('ox_lib:notify', src, {
-                type = 'error',
-                description = string.format("Fonds insuffisants. Prix: $%s", price)
-            })
-            return
-        end
-        exports.ox_inventory:RemoveItem(src, 'money', price)
-    end
-    
-    -- Créer compte
+    -- Créer le compte
     local accountNumber = generateIBANLike()
     local insertAccQuery = string.format(
         "INSERT INTO %s (identifier, type, amount, balance, label, time) VALUES (?, ?, ?, ?, ?, ?)",
@@ -210,7 +287,7 @@ RegisterNetEvent('bank:server:createAccount', function(data)
         return
     end
     
-    -- Créer carte
+    -- Créer carte "pending" (inactive) avec le PIN
     local cardNum = generateCardNumber()
     local insertCardQuery = string.format(
         "INSERT INTO %s (account_id, identifier, owner_name, card_number, pin, active, card_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -222,9 +299,131 @@ RegisterNetEvent('bank:server:createAccount', function(data)
         xPlayer.getName(),
         cardNum,
         pin,
-        1,
-        chosenType
+        0, -- Inactive
+        'pending' -- Type temporaire
     })
+    
+    if not cardId then
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = Config.Notifications.error
+        })
+        return
+    end
+    
+    insertLog(accId, "account_created", 0, xPlayer.identifier, "Compte créé - en attente de carte")
+    
+    TriggerClientEvent('ox_lib:notify', src, {
+        type = 'success',
+        description = "✅ Compte créé ! Rendez-vous au guichet pour acheter votre carte bancaire"
+    })
+end)
+
+-----------------------------------
+-- 💳 EVENT: ACHETER CARTE BANCAIRE
+-----------------------------------
+RegisterNetEvent('bank:server:purchaseCard', function(data)
+    local src = source
+    local xPlayer = ESX.GetPlayerFromId(src)
+    if not xPlayer then return end
+    
+    local accountId = tonumber(data.account_id)
+    local chosenType = tostring(data.card_type or "carte_basique")
+    
+    if not accountId then
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = "Compte invalide"
+        })
+        return
+    end
+    
+    -- Vérifier que le compte appartient au joueur
+    local account = getAccount(accountId)
+    if not account or account.identifier ~= xPlayer.identifier then
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = "Ce compte ne vous appartient pas"
+        })
+        return
+    end
+    
+    -- Vérifier si une carte active existe déjà
+    local cardQuery = string.format(
+        "SELECT id FROM %s WHERE account_id = ? AND active = 1 LIMIT 1",
+        DB.bank_cards_table
+    )
+    local existingCard = dbFetch(cardQuery, {accountId})
+    if existingCard and existingCard[1] then
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = "Une carte active existe déjà pour ce compte"
+        })
+        return
+    end
+    
+    -- Vérifier le prix
+    local limits = Config.CardLimits[chosenType]
+    if not limits then
+        TriggerClientEvent('ox_lib:notify', src, {
+            type = 'error',
+            description = "Type de carte invalide"
+        })
+        return
+    end
+    
+    local price = limits.Price or 0
+    if price > 0 then
+        local playerMoney = exports.ox_inventory:Search(src, 'count', 'money')
+        if playerMoney < price then
+            TriggerClientEvent('ox_lib:notify', src, {
+                type = 'error',
+                description = string.format("Fonds insuffisants. Prix: $%s", price)
+            })
+            return
+        end
+        exports.ox_inventory:RemoveItem(src, 'money', price)
+    end
+    
+    -- Récupérer la carte pending
+    local pendingQuery = string.format(
+        "SELECT id, pin, card_number FROM %s WHERE account_id = ? AND card_type = 'pending' LIMIT 1",
+        DB.bank_cards_table
+    )
+    local pendingCard = dbFetch(pendingQuery, {accountId})
+    
+    local cardId, cardNum, pin
+    
+    if pendingCard and pendingCard[1] then
+        -- Mettre à jour la carte pending
+        cardId = pendingCard[1].id
+        cardNum = pendingCard[1].card_number
+        pin = pendingCard[1].pin
+        
+        local updateQuery = string.format(
+            "UPDATE %s SET active = 1, card_type = ? WHERE id = ?",
+            DB.bank_cards_table
+        )
+        dbExecute(updateQuery, {chosenType, cardId})
+    else
+        -- Créer nouvelle carte (fallback)
+        cardNum = generateCardNumber()
+        pin = string.format("%04d", math.random(0, 9999))
+        
+        local insertCardQuery = string.format(
+            "INSERT INTO %s (account_id, identifier, owner_name, card_number, pin, active, card_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            DB.bank_cards_table
+        )
+        cardId = dbInsert(insertCardQuery, {
+            accountId,
+            xPlayer.identifier,
+            xPlayer.getName(),
+            cardNum,
+            pin,
+            1,
+            chosenType
+        })
+    end
     
     if not cardId then
         TriggerClientEvent('ox_lib:notify', src, {
@@ -237,20 +436,20 @@ RegisterNetEvent('bank:server:createAccount', function(data)
     -- Ajouter carte à l'inventaire
     local metadata = {
         id = cardId,
-        account_id = accId,
+        account_id = accountId,
         owner = xPlayer.getName(),
         card_number = cardNum,
         card_type = chosenType,
-        account_number = accountNumber
+        account_number = account.label
     }
     
     local success = exports.ox_inventory:AddItem(src, Config.BankCardItem[chosenType], 1, metadata)
     
     if success then
-        insertLog(accId, "account_created", 0, xPlayer.identifier, "Création de compte")
+        insertLog(accountId, "card_issued", price, xPlayer.identifier, "Carte émise: " .. chosenType)
         TriggerClientEvent('ox_lib:notify', src, {
             type = 'success',
-            description = Config.Notifications.card_created
+            description = "✅ Carte bancaire ajoutée à votre inventaire !"
         })
     else
         TriggerClientEvent('ox_lib:notify', src, {
@@ -260,7 +459,9 @@ RegisterNetEvent('bank:server:createAccount', function(data)
     end
 end)
 
--- Event: Ouvrir interface
+-----------------------------------
+-- 🏦 EVENT: OUVRIR INTERFACE BANCAIRE
+-----------------------------------
 RegisterNetEvent('bank:server:requestOpen', function()
     local src = source
     local cardItem = getCardFromInventory(src)
@@ -295,7 +496,7 @@ RegisterNetEvent('bank:server:requestOpen', function()
         return
     end
     
-    -- Récupérer historique
+    -- Historique
     local logsQuery = string.format(
         "SELECT action, amount, identifier, description, date FROM %s WHERE account_id = ? ORDER BY date DESC LIMIT 30",
         DB.bank_logs_table
@@ -321,7 +522,9 @@ RegisterNetEvent('bank:server:requestOpen', function()
     TriggerClientEvent('bank:client:openNUI', src, payload)
 end)
 
--- Event: Dépôt
+-----------------------------------
+-- 💰 EVENT: DÉPÔT
+-----------------------------------
 RegisterNetEvent('bank:server:deposit', function(data)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -369,7 +572,7 @@ RegisterNetEvent('bank:server:deposit', function(data)
     -- Transaction
     local updateQuery = string.format("UPDATE %s SET balance = balance + ? WHERE ID = ?", DB.banking_table)
     dbExecute(updateQuery, {amount, cardRow.account_id})
-    insertLog(cardRow.account_id, "deposit", amount, cardRow.identifier, "Dépôt via interface")
+    insertLog(cardRow.account_id, "deposit", amount, cardRow.identifier, "Dépôt via ATM")
     
     xPlayer.removeMoney(amount)
     
@@ -382,7 +585,9 @@ RegisterNetEvent('bank:server:deposit', function(data)
     TriggerClientEvent('bank:client:updateBalance', src, acc.balance or 0)
 end)
 
--- Event: Retrait
+-----------------------------------
+-- 💵 EVENT: RETRAIT
+-----------------------------------
 RegisterNetEvent('bank:server:withdraw', function(data)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -430,7 +635,7 @@ RegisterNetEvent('bank:server:withdraw', function(data)
     -- Transaction
     local updateQuery = string.format("UPDATE %s SET balance = balance - ? WHERE ID = ?", DB.banking_table)
     dbExecute(updateQuery, {amount, cardRow.account_id})
-    insertLog(cardRow.account_id, "withdraw", amount, cardRow.identifier, "Retrait via interface")
+    insertLog(cardRow.account_id, "withdraw", amount, cardRow.identifier, "Retrait via ATM")
     
     xPlayer.addMoney(amount)
     
@@ -443,7 +648,9 @@ RegisterNetEvent('bank:server:withdraw', function(data)
     TriggerClientEvent('bank:client:updateBalance', src, acc2.balance or 0)
 end)
 
--- Event: Transfert
+-----------------------------------
+-- 🔄 EVENT: TRANSFERT
+-----------------------------------
 RegisterNetEvent('bank:server:transfer', function(data)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -540,58 +747,45 @@ RegisterNetEvent('bank:server:transfer', function(data)
     TriggerClientEvent('bank:client:updateBalance', src, after.balance or 0)
 end)
 
--- ==============================
--- FONCTIONS ADMIN (EXPORTS)
--- ==============================
-
+-----------------------------------
+-- 👑 FONCTIONS ADMIN (EXPORTS)
+-----------------------------------
 function AdminDeactivateCard(cardId)
     if not cardId then return false end
-    
     local query = string.format("UPDATE %s SET active = 0 WHERE id = ?", DB.bank_cards_table)
     local result = dbExecute(query, {cardId})
-    
     return result and result > 0
 end
 
 function AdminReprintPin(cardId)
     if not cardId then return nil end
-    
     local newPin = string.format("%04d", math.random(0, 9999))
     local query = string.format("UPDATE %s SET pin = ? WHERE id = ?", DB.bank_cards_table)
     local result = dbExecute(query, {newPin, cardId})
-    
-    if result and result > 0 then
-        return newPin
-    end
+    if result and result > 0 then return newPin end
     return nil
 end
 
 function AdminCreateCardForPlayer(identifier, cardType, ownerName)
     if not identifier or not cardType then return nil end
-    
     local playerLabel = ownerName or identifier
     cardType = cardType or "carte_basique"
     
-    -- Créer compte
     local accountNumber = generateIBANLike()
     local accQuery = string.format(
         "INSERT INTO %s (identifier, type, amount, balance, label, time) VALUES (?, ?, ?, ?, ?, ?)",
         DB.banking_table
     )
     local accId = dbInsert(accQuery, {identifier, 'personal', 0, 0, accountNumber, os.time()})
-    
     if not accId then return nil end
     
-    -- Créer carte
     local cardNum = generateCardNumber()
     local newPin = string.format("%04d", math.random(0, 9999))
-    
     local cardQuery = string.format(
         "INSERT INTO %s (account_id, identifier, owner_name, card_number, pin, active, card_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
         DB.bank_cards_table
     )
     local cardId = dbInsert(cardQuery, {accId, identifier, playerLabel, cardNum, newPin, 1, cardType})
-    
     if not cardId then return nil end
     
     insertLog(accId, "admin_created", 0, identifier, "Compte créé par admin")
@@ -607,7 +801,6 @@ end
 
 function AdminGetAccountInfo(accountId)
     if not accountId then return nil end
-    
     local account = getAccount(accountId)
     if not account then return nil end
     
@@ -623,19 +816,13 @@ function AdminGetAccountInfo(accountId)
     )
     local logs = dbFetch(logsQuery, {accountId}) or {}
     
-    return {
-        account = account,
-        cards = cards,
-        logs = logs
-    }
+    return { account = account, cards = cards, logs = logs }
 end
 
 function AdminSetBalance(accountId, newBalance)
     if not accountId or not newBalance then return false end
-    
     local query = string.format("UPDATE %s SET balance = ? WHERE ID = ?", DB.banking_table)
     local result = dbExecute(query, {newBalance, accountId})
-    
     if result and result > 0 then
         insertLog(accountId, "admin_set_balance", newBalance, "system", "Balance modifiée par admin")
         return true
@@ -643,140 +830,8 @@ function AdminSetBalance(accountId, newBalance)
     return false
 end
 
--- Events admin
-RegisterNetEvent('bank:admin:deactivateCard', function(cardId)
-    local src = source
-    local xPlayer = ESX.GetPlayerFromId(src)
-    
-    -- Vérifier permissions (adapter selon votre système)
-    if not xPlayer or xPlayer.getGroup() ~= 'admin' then
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'error',
-            description = "Permissions insuffisantes"
-        })
-        return
-    end
-    
-    local ok = AdminDeactivateCard(cardId)
-    if ok then
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'success',
-            description = 'Carte désactivée avec succès'
-        })
-    else
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'error',
-            description = 'Erreur lors de la désactivation'
-        })
-    end
-end)
-
-RegisterNetEvent('bank:admin:reprintPin', function(cardId)
-    local src = source
-    local xPlayer = ESX.GetPlayerFromId(src)
-    
-    if not xPlayer or xPlayer.getGroup() ~= 'admin' then
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'error',
-            description = "Permissions insuffisantes"
-        })
-        return
-    end
-    
-    local pin = AdminReprintPin(cardId)
-    if pin then
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'success',
-            description = string.format('Nouveau PIN généré: %s', pin)
-        })
-    else
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'error',
-            description = 'Erreur lors de la génération du PIN'
-        })
-    end
-end)
-
-RegisterNetEvent('bank:admin:createCardFor', function(identifier, cardType, ownerName)
-    local src = source
-    local xPlayer = ESX.GetPlayerFromId(src)
-    
-    if not xPlayer or xPlayer.getGroup() ~= 'admin' then
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'error',
-            description = "Permissions insuffisantes"
-        })
-        return
-    end
-    
-    local result = AdminCreateCardForPlayer(identifier, cardType or "carte_basique", ownerName)
-    if result then
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'success',
-            description = string.format('Carte créée - ID: %s, PIN: %s', result.card_id, result.pin)
-        })
-    else
-        TriggerClientEvent('ox_lib:notify', src, {
-            type = 'error',
-            description = 'Erreur lors de la création'
-        })
-    end
-end)
-
--- Commandes admin
-ESX.RegisterCommand('bankadmin', 'admin', function(xPlayer, args, showError)
-    local src = xPlayer.source
-    
-    if args.action == 'createcard' then
-        if not args.identifier or not args.cardtype then
-            TriggerClientEvent('ox_lib:notify', src, {
-                type = 'error',
-                description = 'Usage: /bankadmin createcard <identifier> <cardtype>'
-            })
-            return
-        end
-        
-        local result = AdminCreateCardForPlayer(args.identifier, args.cardtype, args.name)
-        if result then
-            TriggerClientEvent('ox_lib:notify', src, {
-                type = 'success',
-                description = string.format('Carte créée - PIN: %s', result.pin)
-            })
-        end
-    elseif args.action == 'deactivate' then
-        if not args.cardid then
-            TriggerClientEvent('ox_lib:notify', src, {
-                type = 'error',
-                description = 'Usage: /bankadmin deactivate <cardid>'
-            })
-            return
-        end
-        
-        AdminDeactivateCard(tonumber(args.cardid))
-    elseif args.action == 'setbalance' then
-        if not args.accountid or not args.amount then
-            TriggerClientEvent('ox_lib:notify', src, {
-                type = 'error',
-                description = 'Usage: /bankadmin setbalance <accountid> <amount>'
-            })
-            return
-        end
-        
-        AdminSetBalance(tonumber(args.accountid), tonumber(args.amount))
-    end
-end, false, {
-    help = 'Commandes admin bancaires',
-    validate = false,
-    arguments = {
-        {name = 'action', help = 'Action à effectuer', type = 'string'},
-        {name = 'identifier', help = 'Identifier du joueur', type = 'string'},
-        {name = 'cardtype', help = 'Type de carte', type = 'string'},
-        {name = 'cardid', help = 'ID de la carte', type = 'number'},
-        {name = 'accountid', help = 'ID du compte', type = 'number'},
-        {name = 'amount', help = 'Montant', type = 'number'},
-        {name = 'name', help = 'Nom du propriétaire', type = 'string'}
-    }
-})
-
--- Logs système
+-----------------------------------
+-- 📊 LOGS SYSTÈME
+-----------------------------------
 print('^2[KT Banque]^7 Système bancaire initialisé avec succès')
+print('^3[KT Banque]^7 Mode 2 PNJ activé : PNJ1=Achat carte | PNJ2=Création compte')

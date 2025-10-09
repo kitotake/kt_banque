@@ -58,7 +58,7 @@ Config.ATMModels = {
 }
 
 -- Distance d'interaction
-Config.InteractionDistance = 2.0
+Config.InteractionDistance = 4.0
 Config.ATMDistance = 1.5
 
 -- Liste des blips

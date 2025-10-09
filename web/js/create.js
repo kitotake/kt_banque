@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Vérifier si le PIN est valide (pas trop simple)
   function isValidPin(pin) {
     // Interdire les PINs trop simples
-    const forbidden = ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '1234', '4321', '1212'];
+    const forbidden = ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999'];
     if (forbidden.includes(pin)) {
       return false;
     }
