@@ -14,6 +14,7 @@ function setUIVisible(visible) {
     isUIOpen = false;
     closeAllPages();
     currentPage = null;
+    currentData = null;
   }
 }
 
@@ -33,57 +34,81 @@ function openPage(pageId) {
     page.classList.remove('hidden');
     page.classList.add('active');
     currentPage = pageId;
+    console.log(`[KT Banque] Page ouverte: ${pageId}`);
+  } else {
+    console.error(`[KT Banque] Page introuvable: ${pageId}`);
   }
 }
 
 // Formater montant en devise
 function formatCurrency(amount) {
-  return '$' + parseInt(amount).toLocaleString('fr-FR');
+  const num = parseFloat(amount) || 0;
+  return '$' + num.toLocaleString('fr-FR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
 }
 
 // Formater date
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diff = now - date;
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (seconds < 60) return 'À l\'instant';
-  if (minutes < 60) return `Il y a ${minutes} min`;
-  if (hours < 24) return `Il y a ${hours}h`;
-  if (days < 7) return `Il y a ${days}j`;
+  if (!dateString) return 'Date inconnue';
   
-  return date.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (isNaN(seconds)) return 'Date invalide';
+    
+    if (seconds < 60) return 'À l\'instant';
+    if (minutes < 60) return `Il y a ${minutes} min`;
+    if (hours < 24) return `Il y a ${hours}h`;
+    if (days < 7) return `Il y a ${days}j`;
+    
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('[KT Banque] Erreur formatage date:', error);
+    return 'Date invalide';
+  }
 }
 
-// Mettre à jour l'affichage du solde
+// Mettre à jour l'affichage du solde avec animation
 function updateBalanceUI(balance) {
   const balanceElements = document.querySelectorAll('#balance, #atmBalance');
   balanceElements.forEach(el => {
     if (el) {
       el.textContent = formatCurrency(balance);
-      // Animation
-      el.style.transition = 'transform 0.2s';
-      el.style.transform = 'scale(1.05)';
+      
+      // Animation de mise à jour
+      el.classList.add('balance-update');
       setTimeout(() => {
-        el.style.transform = 'scale(1)';
-      }, 200);
+        el.classList.remove('balance-update');
+      }, 600);
     }
   });
+  
+  // Mettre à jour les données courantes
+  if (currentData) {
+    currentData.balance = balance;
+  }
 }
 
 // Afficher les informations de la carte
 function displayCardInfo(cardMeta) {
-  if (!cardMeta) return;
+  if (!cardMeta) {
+    console.warn('[KT Banque] Pas de métadonnées de carte');
+    return;
+  }
 
   const cardType = document.getElementById('cardType');
   const cardNumber = document.getElementById('cardNumber');
@@ -95,7 +120,7 @@ function displayCardInfo(cardMeta) {
       'carte_or': '🏅 Carte Or',
       'carte_dimas': '💎 Carte Diamant'
     };
-    cardType.textContent = types[cardMeta.card_type] || '💳 Carte';
+    cardType.textContent = types[cardMeta.card_type] || '💳 Carte Bancaire';
   }
 
   if (cardNumber && cardMeta.last4) {
@@ -109,7 +134,10 @@ function displayCardInfo(cardMeta) {
 
 // Afficher les limites
 function displayLimits(limits, isAtm = false) {
-  if (!limits) return;
+  if (!limits) {
+    console.warn('[KT Banque] Pas de limites fournies');
+    return;
+  }
 
   const prefix = isAtm ? 'atm' : '';
   const depositLimit = document.getElementById(`${prefix}${prefix ? 'D' : 'd'}epositLimit`);
@@ -132,13 +160,14 @@ function displayHistory(history) {
   historyList.innerHTML = '';
 
   if (!history || history.length === 0) {
-    historyList.innerHTML = '<li class="history-empty">Aucune transaction récente</li>';
+    historyList.innerHTML = '<li class="history-empty">📭 Aucune transaction récente</li>';
     return;
   }
 
-  history.forEach(transaction => {
+  history.forEach((transaction, index) => {
     const li = document.createElement('li');
     li.className = 'history-item';
+    li.style.animationDelay = `${index * 0.05}s`;
 
     const info = document.createElement('div');
     info.className = 'history-info';
@@ -151,6 +180,7 @@ function displayHistory(history) {
       'withdraw': '💵 Retrait',
       'transfer_out': '📤 Transfert envoyé',
       'transfer_in': '📥 Transfert reçu',
+      'card_issued': '💳 Carte émise',
       'account_created': '✨ Compte créé',
       'admin_created': '👑 Créé par admin',
       'admin_set_balance': '⚙️ Ajustement admin'
@@ -175,13 +205,19 @@ function displayHistory(history) {
     const amount = document.createElement('div');
     amount.className = 'history-amount';
     
-    const isPositive = ['deposit', 'transfer_in', 'admin_set_balance'].includes(transaction.action);
-    amount.classList.add(isPositive ? 'positive' : 'negative');
+    const isPositive = ['deposit', 'transfer_in', 'admin_set_balance', 'card_issued'].includes(transaction.action);
+    const isNeutral = ['account_created', 'admin_created'].includes(transaction.action);
     
-    if (transaction.amount && transaction.amount !== 0) {
-      amount.textContent = (isPositive ? '+' : '-') + formatCurrency(Math.abs(transaction.amount));
-    } else {
+    if (isNeutral) {
+      amount.classList.add('neutral');
       amount.textContent = '—';
+    } else {
+      amount.classList.add(isPositive ? 'positive' : 'negative');
+      if (transaction.amount && transaction.amount !== 0) {
+        amount.textContent = (isPositive ? '+' : '-') + formatCurrency(Math.abs(transaction.amount));
+      } else {
+        amount.textContent = '—';
+      }
     }
 
     li.appendChild(info);
@@ -194,13 +230,19 @@ function displayHistory(history) {
 window.addEventListener('message', function(event) {
   const data = event.data;
 
+  if (!data || !data.action) {
+    console.warn('[KT Banque] Message NUI sans action:', data);
+    return;
+  }
+
+  console.log('[KT Banque] Message NUI reçu:', data.action);
+
   switch(data.action) {
     case 'openBank':
-      currentData = data.data;
+      currentData = data.data || data;
       setUIVisible(true);
       openPage('account-page');
       
-      // Afficher les données
       if (currentData.balance !== undefined) {
         updateBalanceUI(currentData.balance);
       }
@@ -226,14 +268,32 @@ window.addEventListener('message', function(event) {
       break;
 
     case 'openPin':
-      currentData = data.card || data.data;
+      currentData = data.card || data.data || data;
       setUIVisible(true);
       openPage('pin-page');
+      
+      // Focus automatique sur l'input
+      setTimeout(() => {
+        const pinInput = document.getElementById('pinInput');
+        if (pinInput) {
+          pinInput.value = '';
+          pinInput.focus();
+        }
+      }, 100);
       break;
 
     case 'openCreate':
       setUIVisible(true);
       openPage('create-page');
+      
+      // Focus automatique
+      setTimeout(() => {
+        const newPin = document.getElementById('newPin');
+        if (newPin) {
+          newPin.value = '';
+          newPin.focus();
+        }
+      }, 100);
       break;
 
     case 'openATM':
@@ -253,19 +313,15 @@ window.addEventListener('message', function(event) {
     case 'updateBalance':
       if (data.balance !== undefined) {
         updateBalanceUI(data.balance);
-        if (currentData) {
-          currentData.balance = data.balance;
-        }
       }
       break;
 
     case 'close':
       setUIVisible(false);
-      currentData = null;
       break;
 
     default:
-      console.log('[KT Banque] Action NUI inconnue:', data.action);
+      console.warn('[KT Banque] Action NUI inconnue:', data.action);
       break;
   }
 });
@@ -273,6 +329,7 @@ window.addEventListener('message', function(event) {
 // Fermeture avec ESC
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && isUIOpen) {
+    e.preventDefault();
     postNUI('close', {});
     setUIVisible(false);
   }
@@ -280,14 +337,22 @@ document.addEventListener('keydown', function(e) {
 
 // Helper pour envoyer des données au client
 function postNUI(callback, data = {}) {
-  return fetch(`https://${GetParentResourceName()}/${callback}`, {
+  const resourceName = GetParentResourceName();
+  
+  return fetch(`https://${resourceName}/${callback}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(data)
+  }).then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response;
   }).catch(err => {
     console.error('[KT Banque] Erreur NUI:', err);
+    throw err;
   });
 }
 
@@ -317,9 +382,54 @@ document.addEventListener('DOMContentLoaded', function() {
   const inputs = document.querySelectorAll('input[type="number"], input[type="text"], input[type="password"]');
   inputs.forEach(input => {
     input.style.transition = 'all 0.2s ease';
+    
+    // Empêcher les valeurs négatives sur les inputs de type number
+    if (input.type === 'number') {
+      input.addEventListener('input', function() {
+        if (this.value < 0) {
+          this.value = 0;
+        }
+      });
+    }
   });
   
-  console.log('[KT Banque] Système initialisé');
+  // Ajouter des styles CSS dynamiques
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes balance-update {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); color: #10b981; }
+      100% { transform: scale(1); }
+    }
+    
+    .balance-update {
+      animation: balance-update 0.6s ease;
+    }
+    
+    @keyframes history-fade-in {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .history-item {
+      animation: history-fade-in 0.3s ease forwards;
+      opacity: 0;
+    }
+    
+    .history-amount.neutral {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  console.log('[KT Banque] Système initialisé avec succès');
 });
 
 // Export global pour utilisation dans d'autres fichiers
@@ -334,5 +444,17 @@ window.KTBanque = {
   formatCurrency,
   formatDate,
   postNUI,
-  GetParentResourceName
+  GetParentResourceName,
+  getCurrentData: () => currentData,
+  isOpen: () => isUIOpen
 };
+
+// Protection contre les erreurs globales
+window.addEventListener('error', function(event) {
+  console.error('[KT Banque] Erreur JavaScript:', event.error);
+});
+
+// Message de test pour le développement
+if (window.location.protocol === 'file:') {
+  console.log('[KT Banque] Mode développement détecté - Interface testable');
+}
