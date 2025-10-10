@@ -4,11 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KT Banque</title>
-
-  <!-- Styles -->
   <link rel="stylesheet" href="style/main.css" />
   <link rel="stylesheet" href="style/pin.css" />
   <link rel="stylesheet" href="style/account.css" />
+  <link rel="stylesheet" href="style/create.css" />
 </head>
 <body>
   <div id="app-container">
@@ -18,17 +17,22 @@
       <div class="card">
         <h2>🔐 Connexion Bancaire</h2>
         <p class="subtitle">Entrez votre code PIN à 4 chiffres</p>
-
-        <input
-          id="pinInput"
-          type="password"
-          maxlength="4"
-          placeholder="• • • •"
-          autocomplete="off"
-        />
+        <input id="pinInput" type="password" maxlength="4" placeholder="• • • •" autocomplete="off" />
         <button id="pinSubmit" class="btn-primary">Valider</button>
-        <button id="createAccountBtn" class="btn-secondary">Créer un compte</button>
         <p id="pinError" class="error hidden">❌ Code PIN incorrect</p>
+      </div>
+    </div>
+
+    <!-- PAGE: Création de compte -->
+    <div id="create-page" class="page hidden">
+      <div class="card">
+        <h2>✨ Créer un Compte Bancaire</h2>
+        <p class="subtitle">Choisissez un code PIN à 4 chiffres</p>
+        <input type="password" id="newPin" maxlength="4" placeholder="Code PIN (4 chiffres)" autocomplete="off" />
+        <input type="password" id="confirmPin" maxlength="4" placeholder="Confirmer le PIN" autocomplete="off" />
+        <button id="createBtn" class="btn-primary">Créer le compte</button>
+        <button id="cancelCreateBtn" class="btn-secondary">Annuler</button>
+        <p id="createError" class="error hidden">❌ Les PIN ne correspondent pas</p>
       </div>
     </div>
 
@@ -83,7 +87,7 @@
                 <span class="action-icon">💰</span>
                 <h3>Déposer</h3>
               </div>
-              <input id="depositAmount" type="number" placeholder="Montant à déposer" min="1" class="input-amount" />
+              <input id="depositAmount" type="number" placeholder="Montant" min="1" class="input-amount" />
               <button id="depositBtn" class="btn-action btn-deposit">Déposer</button>
             </div>
 
@@ -93,17 +97,19 @@
                 <span class="action-icon">💵</span>
                 <h3>Retirer</h3>
               </div>
-              <input id="withdrawAmount" type="number" placeholder="Montant à retirer" min="1" class="input-amount" />
+              <input id="withdrawAmount" type="number" placeholder="Montant" min="1" class="input-amount" />
               <button id="withdrawBtn" class="btn-action btn-withdraw">Retirer</button>
             </div>
 
-            <!-- ATM -->
+            <!-- Transfert -->
             <div class="action-card">
               <div class="action-header">
-                <span class="action-icon">🏧</span>
-                <h3>Utiliser un distributeur</h3>
+                <span class="action-icon">🔄</span>
+                <h3>Transférer</h3>
               </div>
-              <button id="openAtmBtn" class="btn-action btn-atm">Accéder à un ATM</button>
+              <input id="transferTarget" type="text" placeholder="N° Compte ou ID" class="input-amount" />
+              <input id="transferAmount" type="number" placeholder="Montant" min="1" class="input-amount" />
+              <button id="transferBtn" class="btn-action btn-transfer">Transférer</button>
             </div>
           </section>
 
@@ -123,9 +129,53 @@
         </footer>
       </div>
     </div>
+
+    <!-- ATM Modal -->
+    <div id="atm-modal" class="page hidden">
+      <div class="card atm-card">
+        <header class="atm-header">
+          <h1>🏧 Distributeur Automatique</h1>
+          <button id="closeAtmBtn" class="btn-close">✕</button>
+        </header>
+        <main class="atm-main">
+          <section class="atm-balance">
+            <div class="label">Solde disponible</div>
+            <div id="atmBalance" class="balance">$0</div>
+          </section>
+          <section class="limits">
+            <div class="limit-item">
+              <span class="limit-label">📥 Dépôt max</span>
+              <span class="limit-value" id="atmDepositLimit">$5000</span>
+            </div>
+            <div class="limit-item">
+              <span class="limit-label">📤 Retrait max</span>
+              <span class="limit-value" id="atmWithdrawLimit">$2000</span>
+            </div>
+          </section>
+          <section class="actions">
+            <div class="action-card">
+              <div class="action-header">
+                <span class="action-icon">💰</span>
+                <h3>Déposer</h3>
+              </div>
+              <input id="atmDepositAmount" type="number" placeholder="Montant" min="1" class="input-amount" />
+              <button id="atmDepositBtn" class="btn-action btn-deposit">Déposer</button>
+            </div>
+            <div class="action-card">
+              <div class="action-header">
+                <span class="action-icon">💵</span>
+                <h3>Retirer</h3>
+              </div>
+              <input id="atmWithdrawAmount" type="number" placeholder="Montant" min="1" class="input-amount" />
+              <button id="atmWithdrawBtn" class="btn-action btn-withdraw">Retirer</button>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
   </div>
-  <script src="js/main.js"></script>
-  <script src="js/pin.js"></script>
-  
+
+  <script src="js/app.js"></script>
 </body>
 </html>

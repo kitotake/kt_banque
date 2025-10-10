@@ -107,4 +107,4 @@ Config.Animations = {
 }
 
 -- Debug mode
-Config.Debug = false
+Config.Debug = false --true -- 

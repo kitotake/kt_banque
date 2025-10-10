@@ -31,11 +31,11 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: transparent;
   color: var(--text-primary);
-  display: none; /* Caché par défaut - IMPORTANT */
+  display: none; /* Caché par défaut */
 }
 
 body.show {
-  display: block; /* Visible quand la classe show est ajoutée */
+  display: block;
 }
 
 #app-container {
@@ -45,9 +45,10 @@ body.show {
   justify-content: center;
   align-items: center;
   background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
 }
 
-/* Pages */
+/* ==================== PAGES ==================== */
 .page {
   display: none;
   width: 100%;
@@ -62,17 +63,16 @@ body.show {
   display: flex;
 }
 
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.hidden {
+  display: none !important;
 }
 
-/* Card générique */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==================== CARDS ==================== */
 .card {
   background: var(--darker);
   border: 1px solid var(--border);
@@ -85,7 +85,7 @@ body.show {
 }
 
 .atm-card {
-  max-width: 450px;
+  max-width: 500px;
 }
 
 @keyframes slideIn {
@@ -99,7 +99,7 @@ body.show {
   }
 }
 
-/* Dashboard */
+/* ==================== DASHBOARD ==================== */
 .dashboard {
   background: var(--darker);
   border: 1px solid var(--border);
@@ -113,7 +113,7 @@ body.show {
   box-shadow: var(--shadow);
 }
 
-/* Header */
+/* ==================== HEADER ==================== */
 .header,
 .atm-header {
   background: var(--dark);
@@ -138,7 +138,7 @@ body.show {
   color: var(--text-primary);
 }
 
-/* Main content */
+/* ==================== MAIN CONTENT ==================== */
 .main-content,
 .atm-main {
   flex: 1;
@@ -162,7 +162,7 @@ body.show {
   border-radius: 4px;
 }
 
-/* Footer */
+/* ==================== FOOTER ==================== */
 .footer {
   background: var(--dark);
   border-top: 1px solid var(--border);
@@ -184,7 +184,7 @@ body.show {
   font-size: 12px;
 }
 
-/* Titres */
+/* ==================== TITRES ==================== */
 h2 {
   font-size: 24px;
   font-weight: 700;
@@ -206,7 +206,7 @@ h3 {
   text-align: center;
 }
 
-/* Boutons */
+/* ==================== BOUTONS ==================== */
 .btn-primary,
 .btn-secondary,
 .btn-action {
@@ -234,6 +234,11 @@ h3 {
 
 .btn-primary:active {
   transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
@@ -268,7 +273,37 @@ h3 {
   transform: rotate(90deg);
 }
 
-/* Inputs */
+.btn-deposit {
+  background: var(--secondary);
+  color: white;
+}
+
+.btn-deposit:hover {
+  background: #059669;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-withdraw {
+  background: var(--warning);
+  color: white;
+}
+
+.btn-withdraw:hover {
+  background: #d97706;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.btn-transfer {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-transfer:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+/* ==================== INPUTS ==================== */
 input[type="text"],
 input[type="number"],
 input[type="password"],
@@ -295,7 +330,15 @@ input::placeholder {
   color: var(--text-secondary);
 }
 
-/* Messages d'erreur */
+input.valid {
+  border-color: var(--secondary);
+}
+
+input.invalid {
+  border-color: var(--danger);
+}
+
+/* ==================== ERREURS ==================== */
 .error {
   color: var(--danger);
   font-size: 14px;
@@ -307,33 +350,7 @@ input::placeholder {
   text-align: center;
 }
 
-/* Loading */
-.loading {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  z-index: 9999;
-}
-
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 16px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Sections */
+/* ==================== SECTIONS ==================== */
 section {
   margin-bottom: 24px;
 }
@@ -344,7 +361,73 @@ section h2 {
   text-align: left;
 }
 
-/* Responsiveness */
+/* ==================== ANIMATIONS ==================== */
+@keyframes slideInScale {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.error-shake {
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+  20%, 40%, 60%, 80% { transform: translateX(10px); }
+}
+
+.balance-update {
+  animation: balance-update 0.5s ease;
+}
+
+@keyframes balance-update {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); color: var(--secondary); }
+  100% { transform: scale(1); }
+}
+
+/* ==================== ATM MODAL ==================== */
+#atm-modal {
+  z-index: 100;
+}
+
+.atm-balance {
+  background: var(--dark);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.atm-balance .label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.limits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ==================== RESPONSIVE ==================== */
 @media (max-width: 768px) {
   .dashboard,
   .card {
@@ -371,26 +454,8 @@ section h2 {
   .card {
     padding: 24px;
   }
-}
-
-/* Animations supplémentaires */
-@keyframes slideInScale {
-  0% {
-    opacity: 0;
-    transform: translateY(30px) scale(0.9);
+  
+  .limits {
+    grid-template-columns: 1fr;
   }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.error-shake {
-  animation: shake 0.5s;
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-  20%, 40%, 60%, 80% { transform: translateX(10px); }
 }
