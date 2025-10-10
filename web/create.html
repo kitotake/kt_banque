@@ -4,18 +4,38 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Créer un compte — KT Banque</title>
+
+  <!-- Styles -->
   <link rel="stylesheet" href="style/main.css" />
   <link rel="stylesheet" href="style/create.css" />
 </head>
 <body>
-  <div id="create-screen" class="screen">
-    <h2>Créer votre compte bancaire</h2>
-    <input type="password" id="newPin" maxlength="4" placeholder="PIN (4 chiffres)" />
-    <button id="createBtn">Créer le compte</button>
-    <button id="cancelBtn" class="secondary">Annuler</button>
-    <p id="createError" class="error hidden">Erreur lors de la création</p>
+  <div id="create-container" class="screen">
+    <div class="card">
+      <h2>✨ Créer un Compte Bancaire</h2>
+      <p class="subtitle">Choisissez un code PIN à 4 chiffres</p>
+
+      <input 
+        type="password" 
+        id="newPin" 
+        maxlength="4" 
+        placeholder="Code PIN (4 chiffres)" 
+        autocomplete="off"
+      />
+      <input 
+        type="password" 
+        id="confirmPin" 
+        maxlength="4" 
+        placeholder="Confirmer le PIN" 
+        autocomplete="off"
+      />
+
+      <button id="createBtn" class="btn-primary">Créer le compte</button>
+      <button id="cancelBtn" class="btn-secondary">Annuler</button>
+      <p id="createError" class="error hidden">❌ Les PIN ne correspondent pas</p>
+    </div>
   </div>
 
-  <script src="js/create.js"></script>
+
 </body>
 </html>

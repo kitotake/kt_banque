@@ -1,3 +1,5 @@
+// create.js — Gestion de la création de compte (version pages séparées)
+
 document.addEventListener('DOMContentLoaded', function() {
   const createBtn = document.getElementById('createBtn');
   const cancelCreateBtn = document.getElementById('cancelCreateBtn');
@@ -12,12 +14,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const pin1 = newPin.value.trim();
     const pin2 = confirmPin.value.trim();
 
-    // Réinitialiser les styles
     newPin.classList.remove('valid', 'invalid');
     confirmPin.classList.remove('valid', 'invalid');
     hideError();
 
-    // Valider le premier PIN
+    // Validation du premier PIN
     if (pin1.length === 4) {
       if (isValidPin(pin1)) {
         newPin.classList.add('valid');
@@ -31,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
       return false;
     }
 
-    // Valider la confirmation
+    // Validation de la confirmation
     if (pin2.length === 4) {
       if (pin1 === pin2) {
         confirmPin.classList.add('valid');
@@ -51,92 +52,65 @@ document.addEventListener('DOMContentLoaded', function() {
     return false;
   }
 
-  // Vérifier si le PIN est valide (pas trop simple)
+  // Vérifie si le PIN n’est pas trop simple
   function isValidPin(pin) {
-    // Interdire les PINs trop simples
-    const forbidden = ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999'];
-    if (forbidden.includes(pin)) {
-      return false;
-    }
-
-    // Vérifier si tous les chiffres sont identiques
-    if (/^(\d)\1{3}$/.test(pin)) {
-      return false;
-    }
-
-    return true;
+    const forbidden = [
+      '0000','1111','2222','3333','4444','5555','6666','7777','8888','9999',
+      '1234','4321','2468','1357'
+    ];
+    return !(forbidden.includes(pin) || /^(\d)\1{3}$/.test(pin));
   }
 
-  // Créer le compte
+  // Création du compte
   function createAccount() {
     const pin = newPin.value.trim();
     const confirmPinValue = confirmPin.value.trim();
 
-    // Validation finale
     if (pin.length !== 4 || isNaN(pin)) {
-      showError('Le PIN doit contenir exactement 4 chiffres');
-      newPin.focus();
+      showError('Le PIN doit contenir exactement 4 chiffres.');
       return;
     }
 
     if (!isValidPin(pin)) {
       showError('Ce PIN est trop simple. Choisissez-en un autre.');
-      newPin.focus();
       return;
     }
 
     if (pin !== confirmPinValue) {
-      showError('Les codes PIN ne correspondent pas');
-      confirmPin.focus();
+      showError('Les codes PIN ne correspondent pas.');
       return;
     }
 
-    // Désactiver le bouton pendant le traitement
     createBtn.disabled = true;
     createBtn.textContent = 'Création en cours...';
 
-    // Envoyer au serveur
-    window.KTBanque.postNUI('createAccount', { pin: pin })
-      .then(() => {
-        // Animation de succès
-        newPin.classList.add('success-animation');
-        confirmPin.classList.add('success-animation');
-        
-        // Réinitialiser après un court délai
-        setTimeout(() => {
-          clearForm();
-        }, 1000);
-      })
-      .catch((error) => {
-        console.error('Erreur création compte:', error);
-        showError('Erreur lors de la création du compte');
-        createBtn.disabled = false;
-        createBtn.textContent = 'Créer le compte';
-      });
+    // Enregistrement local (simule une création de compte)
+    localStorage.setItem('userPIN', pin);
+    localStorage.setItem('balance', '1000'); // solde initial
+    alert('✅ Compte créé avec succès !');
+
+    // Redirection vers la page principale
+    setTimeout(() => {
+      window.location.href = 'index.html';
+    }, 500);
   }
 
-  // Afficher erreur
+  // Affiche une erreur
   function showError(message) {
     if (createError) {
       createError.textContent = message;
       createError.classList.remove('hidden');
-      
-      // Animation shake
       createError.classList.add('error-shake');
-      setTimeout(() => {
-        createError.classList.remove('error-shake');
-      }, 500);
+      setTimeout(() => createError.classList.remove('error-shake'), 500);
     }
   }
 
-  // Masquer erreur
+  // Cache l’erreur
   function hideError() {
-    if (createError) {
-      createError.classList.add('hidden');
-    }
+    if (createError) createError.classList.add('hidden');
   }
 
-  // Réinitialiser le formulaire
+  // Réinitialise le formulaire
   function clearForm() {
     newPin.value = '';
     confirmPin.value = '';
@@ -147,63 +121,43 @@ document.addEventListener('DOMContentLoaded', function() {
     createBtn.textContent = 'Créer le compte';
   }
 
-  // Event listeners
+  // Événements
   createBtn.addEventListener('click', createAccount);
 
   newPin.addEventListener('input', function() {
-    // Accepter uniquement les chiffres
     this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);
     validatePins();
   });
 
   confirmPin.addEventListener('input', function() {
-    // Accepter uniquement les chiffres
     this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);
     validatePins();
   });
 
-  // Enter pour valider
-  newPin.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter' && this.value.length === 4) {
-      confirmPin.focus();
-    }
+  // Touche Entrée
+  newPin.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && newPin.value.length === 4) confirmPin.focus();
   });
 
-  confirmPin.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter' && this.value.length === 4 && !createBtn.disabled) {
+  confirmPin.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && confirmPin.value.length === 4 && !createBtn.disabled) {
       createAccount();
     }
   });
 
-  // Bouton annuler
+  // Bouton Annuler
   if (cancelCreateBtn) {
-    cancelCreateBtn.addEventListener('click', function() {
+    cancelCreateBtn.addEventListener('click', () => {
       clearForm();
-      window.KTBanque.postNUI('close', {});
-      window.KTBanque.setUIVisible(false);
+      window.location.href = 'index.html';
     });
   }
 
-  // Focus automatique quand la page s'ouvre
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.target.id === 'create-page' && mutation.target.classList.contains('active')) {
-        setTimeout(() => {
-          clearForm();
-          newPin.focus();
-        }, 100);
-      }
-    });
-  });
+  // Focus auto
+  setTimeout(() => {
+    newPin.focus();
+  }, 100);
 
-  const createPage = document.getElementById('create-page');
-  if (createPage) {
-    observer.observe(createPage, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-  }
-
-  // Désactiver le bouton par défaut
   createBtn.disabled = true;
+  console.log('[KT Banque] create.js chargé — version pages séparées');
 });

@@ -62,9 +62,6 @@ body.show {
   display: flex;
 }
 
-.hidden {
-  display: none !important;
-}
 
 @keyframes fadeIn {
   from {
