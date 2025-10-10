@@ -5,7 +5,7 @@ lua54 'yes'
 author 'Kitotake Development'
 
 description 'Système bancaire avancé avec cartes et ATM'
-version '6.4.0'
+version '6.5.0'
 
 shared_scripts {
     '@es_extended/imports.lua',

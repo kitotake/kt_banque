@@ -107,4 +107,6 @@ Config.Animations = {
 }
 
 -- Debug mode
-Config.Debug = false --true -- 
+Config.RequireCard = true       -- Nécessite une carte pour utiliser le système
+Config.Debug = false            -- Mode debug (logs détaillés)
+Config.SpamDelay = 1000        -- Délai anti-spam en ms
