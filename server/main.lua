@@ -54,7 +54,6 @@ end
 -- ==================== SYNCHRONISATION ESX ====================
 local ESXSync = {}
 
--- Synchroniser le solde KT Banque → ESX
 function ESXSync.UpdateESXBankAccount(identifier, amount)
     local xPlayer = ESX.GetPlayerFromIdentifier(identifier)
     if not xPlayer then 
@@ -62,13 +61,11 @@ function ESXSync.UpdateESXBankAccount(identifier, amount)
         return false
     end
     
-    -- Mettre à jour le compte 'bank' dans ESX
     xPlayer.setAccountMoney('bank', amount)
     Utils.DebugPrint(("✅ ESX bank sync: %s = $%s"):format(identifier, amount))
     return true
 end
 
--- Récupérer le solde ESX pour comparaison
 function ESXSync.GetESXBankBalance(identifier)
     local xPlayer = ESX.GetPlayerFromIdentifier(identifier)
     if not xPlayer then return 0 end
@@ -77,7 +74,6 @@ function ESXSync.GetESXBankBalance(identifier)
     return bankAccount and bankAccount.money or 0
 end
 
--- Synchronisation bidirectionnelle au chargement du joueur
 function ESXSync.SyncOnPlayerLoad(source)
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then return end
@@ -88,7 +84,6 @@ function ESXSync.SyncOnPlayerLoad(source)
     if card then
         local account = Database.GetAccount(card.account_id)
         if account then
-            -- Sync KT → ESX
             ESXSync.UpdateESXBankAccount(identifier, account.balance)
             Utils.DebugPrint(("🔄 Sync chargement: %s KT=$%s"):format(identifier, account.balance))
         end
@@ -129,8 +124,6 @@ function Database.CreateAccount(identifier, pin, ownerName)
     )
     
     Database.InsertLog(accountId, 'account_created', 0, identifier, 'Création du compte')
-    
-    -- Sync ESX
     ESXSync.UpdateESXBankAccount(identifier, 0)
     
     return accountId
@@ -142,7 +135,6 @@ function Database.UpdateBalance(accountId, newBalance)
         {newBalance, accountId}
     )
     
-    -- Récupérer l'identifier pour sync ESX
     local account = Database.GetAccount(accountId)
     if account then
         ESXSync.UpdateESXBankAccount(account.identifier, newBalance)
@@ -191,7 +183,7 @@ function Bank.GetFullAccountData(identifier)
     
     return {
         account_id = account.account_id,
-        balance = account.balance,
+        balance = tonumber(account.balance) or 0,
         pin = card.pin,
         requiresPin = true,
         card_meta = {
@@ -205,7 +197,12 @@ function Bank.GetFullAccountData(identifier)
             label = account.label,
             created = account.created_at
         },
-        limits = limits,
+        limits = {
+            MaxDeposit = tonumber(limits.MaxDeposit) or 5000,
+            MaxWithdraw = tonumber(limits.MaxWithdraw) or 2000,
+            Price = tonumber(limits.Price) or 0,
+            DisplayName = limits.DisplayName or "Carte Basique"
+        },
         history = history
     }
 end
@@ -227,9 +224,13 @@ function Bank.Deposit(source, amount, pin)
     
     local cardType = Utils.GetPlayerCardType(source) or card.card_type
     local limits = Config.CardLimits[cardType]
-    local maxDeposit = tonumber(limits.MaxDeposit) or 0
+    local maxDeposit = tonumber(limits.MaxDeposit) or 5000
     
-    if amount > maxDeposit then return false, "limit_exceeded" end
+    -- CORRECTIF: Vérification stricte de la limite
+    if amount > maxDeposit then 
+        Utils.DebugPrint(("❌ Dépôt refusé: %s > limite %s"):format(amount, maxDeposit))
+        return false, "limit_exceeded" 
+    end
     
     local account = Database.GetAccount(card.account_id)
     local currentBalance = tonumber(account.balance) or 0
@@ -257,16 +258,19 @@ function Bank.Withdraw(source, amount, pin)
     if not card then return false, "no_card" end
     
     local account = Database.GetAccount(card.account_id)
-    
-    -- Conversion sécurisée des types
     local accountBalance = tonumber(account.balance) or 0
+    
     if accountBalance < amount then return false, "insufficient_balance" end
     
     local cardType = Utils.GetPlayerCardType(source) or card.card_type
     local limits = Config.CardLimits[cardType]
-    local maxWithdraw = tonumber(limits.MaxWithdraw) or 0
+    local maxWithdraw = tonumber(limits.MaxWithdraw) or 2000
     
-    if amount > maxWithdraw then return false, "limit_exceeded" end
+    -- CORRECTIF: Vérification stricte de la limite
+    if amount > maxWithdraw then 
+        Utils.DebugPrint(("❌ Retrait refusé: %s > limite %s"):format(amount, maxWithdraw))
+        return false, "limit_exceeded" 
+    end
     
     -- Transaction
     local newBalance = accountBalance - amount
@@ -327,13 +331,11 @@ end
 
 -- ==================== EVENTS ====================
 
--- Ouverture interface
 RegisterNetEvent('bank:server:requestOpen', function()
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return end
     
-    -- Vérifier carte si requis
     if Config.RequireCard then
         local cardType = Utils.GetPlayerCardType(src)
         if not cardType then
@@ -351,7 +353,6 @@ RegisterNetEvent('bank:server:requestOpen', function()
     TriggerClientEvent('bank:client:receiveAccountData', src, data)
 end)
 
--- Vérifier compte existant
 RegisterNetEvent('bank:server:checkExistingAccount', function()
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -365,29 +366,23 @@ RegisterNetEvent('bank:server:checkExistingAccount', function()
     end
 end)
 
--- Création compte
 RegisterNetEvent('bank:server:createAccount', function(pin)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return end
     
-    -- Vérifier si compte existe déjà
     local existingCard = Database.GetCard(xPlayer.identifier)
     if existingCard then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.account_exists)
         return
     end
     
-    -- Valider PIN
     if not Utils.ValidatePin(pin) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.invalid_pin)
         return
     end
     
-    -- Créer compte
     local accountId = Database.CreateAccount(xPlayer.identifier, pin, xPlayer.getName())
-    
-    -- Donner carte basique
     exports.ox_inventory:AddItem(src, Config.BankCardItem.carte_basique, 1)
     
     TriggerClientEvent('bank:client:notify', src, 'success', Config.Lang.account_created)
@@ -396,7 +391,6 @@ RegisterNetEvent('bank:server:createAccount', function(pin)
     Utils.DebugPrint(("✨ Compte créé pour %s"):format(xPlayer.identifier))
 end)
 
--- Dépôt
 RegisterNetEvent('bank:server:deposit', function(amount, cardId, pin)
     local src = source
     local success, result = Bank.Deposit(src, amount, pin)
@@ -410,7 +404,6 @@ RegisterNetEvent('bank:server:deposit', function(amount, cardId, pin)
     end
 end)
 
--- Retrait
 RegisterNetEvent('bank:server:withdraw', function(amount, cardId, pin)
     local src = source
     local success, result = Bank.Withdraw(src, amount, pin)
@@ -424,7 +417,6 @@ RegisterNetEvent('bank:server:withdraw', function(amount, cardId, pin)
     end
 end)
 
--- Transfert
 RegisterNetEvent('bank:server:transfer', function(amount, target, cardId, pin)
     local src = source
     local success, result = Bank.Transfer(src, amount, target, pin)
@@ -438,13 +430,11 @@ RegisterNetEvent('bank:server:transfer', function(amount, target, cardId, pin)
     end
 end)
 
--- Amélioration carte
 RegisterNetEvent('bank:server:upgradeCard', function(newCardType)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return end
     
-    -- Vérifier type de carte valide
     if not Config.CardLimits[newCardType] then
         TriggerClientEvent('bank:client:notify', src, 'error', 'Type de carte invalide')
         return
@@ -467,15 +457,12 @@ RegisterNetEvent('bank:server:upgradeCard', function(newCardType)
         return
     end
     
-    -- Retirer ancienne carte
     for oldType, oldItem in pairs(Config.BankCardItem) do
         exports.ox_inventory:RemoveItem(src, oldItem, 1)
     end
     
-    -- Ajouter nouvelle carte
     exports.ox_inventory:AddItem(src, Config.BankCardItem[newCardType], 1)
     
-    -- Débiter et mettre à jour
     local newBalance = accountBalance - price
     Database.UpdateBalance(card.account_id, newBalance)
     Database.UpdateCardType(xPlayer.identifier, newCardType)
@@ -488,13 +475,11 @@ end)
 
 -- ==================== EVENT HANDLERS ESX ====================
 
--- Synchronisation au chargement du joueur
 AddEventHandler('esx:playerLoaded', function(playerId, xPlayer)
-    Wait(2000) -- Attendre que tout soit chargé
+    Wait(2000)
     ESXSync.SyncOnPlayerLoad(playerId)
 end)
 
--- Nettoyage à la déconnexion
 AddEventHandler('esx:playerDropped', function(playerId)
     if lastAction[playerId] then
         lastAction[playerId] = nil
@@ -502,6 +487,7 @@ AddEventHandler('esx:playerDropped', function(playerId)
 end)
 
 -- ==================== EXPORTS ====================
+
 exports('GetAccountBalance', function(identifier)
     local card = Database.GetCard(identifier)
     if not card then return 0 end
@@ -544,6 +530,7 @@ exports('RemoveMoney', function(identifier, amount)
 end)
 
 -- ==================== COMMANDES ADMIN ====================
+
 RegisterCommand('syncbank', function(source, args)
     if source ~= 0 then
         local xPlayer = ESX.GetPlayerFromId(source)
