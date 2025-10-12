@@ -3,6 +3,7 @@ local isUIOpen = false
 local nearATM = false
 local currentAccount = nil
 local isInAnimation = false
+local animationThread = nil
 
 -- ==================== UTILITAIRES ====================
 local function DebugPrint(message)
@@ -30,7 +31,28 @@ local function Notify(type, message)
     })
 end
 
--- ==================== ANIMATIONS ====================
+-- ==================== ANIMATIONS CORRIGÉES ====================
+local function StopAnimation()
+    if not isInAnimation then return end
+    
+    local ped = PlayerPedId()
+    
+    -- Arrêt propre de l'animation
+    if IsEntityPlayingAnim(ped, Config.Animations.dict, Config.Animations.anim, 3) then
+        StopAnimTask(ped, Config.Animations.dict, Config.Animations.anim, 1.0)
+    end
+    
+    ClearPedTasks(ped)
+    isInAnimation = false
+    
+    -- Arrêter le thread de surveillance
+    if animationThread then
+        animationThread = nil
+    end
+    
+    DebugPrint("🟢 Animation arrêtée proprement")
+end
+
 local function PlayATMAnimation()
     if not Config.Animations.enabled or isInAnimation then return end
     
@@ -39,12 +61,11 @@ local function PlayATMAnimation()
     local anim = Config.Animations.anim
     local flag = Config.Animations.flag
 
-    -- Charger l’animation
+    -- Charger l'animation avec timeout
     RequestAnimDict(dict)
-    local timeout = 0
-    while not HasAnimDictLoaded(dict) and timeout < 5000 do
-        Wait(50)
-        timeout += 50
+    local timeout = GetGameTimer() + 5000
+    while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+        Wait(10)
     end
 
     if not HasAnimDictLoaded(dict) then
@@ -55,43 +76,70 @@ local function PlayATMAnimation()
     isInAnimation = true
     DebugPrint("✅ Animation ATM lancée")
 
+    -- Lancer l'animation
     TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, flag, 0, false, false, false)
 
-    -- Vérification en boucle pour éviter l’animation infinie
-    CreateThread(function()
+    -- Thread de surveillance amélioré
+    if animationThread then
+        animationThread = nil
+    end
+    
+    animationThread = CreateThread(function()
         local startTime = GetGameTimer()
-        while isInAnimation do
+        local maxDuration = 30000 -- 30 secondes max
+        
+        while isInAnimation and animationThread do
             Wait(500)
             
-            -- Si le ped ne joue plus l'anim ou a bougé, on stop
-            if not IsEntityPlayingAnim(ped, dict, anim, 3) then
-                DebugPrint("⚠️ Animation interrompue (non en lecture)")
-                StopAnimation()
-                break
+            local currentPed = PlayerPedId()
+            
+            -- Vérifications multiples pour arrêt automatique
+            local shouldStop = false
+            
+            -- 1. Le ped a changé
+            if currentPed ~= ped then
+                shouldStop = true
+                DebugPrint("⚠️ Le ped a changé")
             end
-
-            -- Si le joueur s’éloigne d’un ATM ou dépasse la durée max
-            if not nearATM or (GetGameTimer() - startTime > 15000) then
-                DebugPrint("⏹️ Animation stoppée (distance/durée max atteinte)")
+            
+            -- 2. L'animation ne joue plus
+            if not IsEntityPlayingAnim(currentPed, dict, anim, 3) then
+                shouldStop = true
+                DebugPrint("⚠️ Animation interrompue (non en lecture)")
+            end
+            
+            -- 3. Plus près d'un ATM
+            if not nearATM then
+                shouldStop = true
+                DebugPrint("⚠️ Plus près d'un ATM")
+            end
+            
+            -- 4. Durée maximale atteinte
+            if (GetGameTimer() - startTime) > maxDuration then
+                shouldStop = true
+                DebugPrint("⏹️ Durée maximale atteinte")
+            end
+            
+            -- 5. L'UI est fermée
+            if not isUIOpen then
+                shouldStop = true
+                DebugPrint("⚠️ UI fermée")
+            end
+            
+            -- 6. Le joueur est dans un véhicule
+            if IsPedInAnyVehicle(currentPed, false) then
+                shouldStop = true
+                DebugPrint("⚠️ Joueur en véhicule")
+            end
+            
+            if shouldStop then
                 StopAnimation()
                 break
             end
         end
+        
+        animationThread = nil
     end)
-end
-
-local function StopAnimation()
-    if not isInAnimation then return end
-    
-    local ped = PlayerPedId()
-
-    -- Si le joueur joue encore une animation, on la stop
-    if IsEntityPlayingAnim(ped, Config.Animations.dict, Config.Animations.anim, 3) then
-        ClearPedTasks(ped)
-    end
-
-    isInAnimation = false
-    DebugPrint("🟢 Animation arrêtée proprement")
 end
 
 -- ==================== INTERFACE NUI ====================
@@ -109,6 +157,12 @@ function UI.Open(data)
         action = 'openBank',
         data = data
     })
+    
+    -- Lancer l'animation après l'ouverture
+    if nearATM then
+        Wait(100)
+        PlayATMAnimation()
+    end
 end
 
 function UI.OpenCreate()
@@ -148,6 +202,7 @@ function UI.Close()
         action = 'close'
     })
     
+    -- Arrêter l'animation proprement
     StopAnimation()
 end
 
@@ -257,10 +312,9 @@ CreateThread(function()
             local hash = GetHashKey(model)
             
             RequestModel(hash)
-            local timeout = 0
-            while not HasModelLoaded(hash) and timeout < 5000 do
+            local timeout = GetGameTimer() + 5000
+            while not HasModelLoaded(hash) and GetGameTimer() < timeout do
                 Wait(100)
-                timeout = timeout + 100
             end
             
             if HasModelLoaded(hash) then
@@ -289,12 +343,13 @@ CreateThread(function()
     end
 end)
 
--- ==================== DETECTION ATM ====================
+-- ==================== DETECTION ATM OPTIMISÉE ====================
 CreateThread(function()
     while true do
-        local sleep = 500
+        local sleep = 1000
         local ped = PlayerPedId()
         local coords = GetEntityCoords(ped)
+        local wasNearATM = nearATM
         nearATM = false
         
         for _, model in pairs(Config.ATMModels) do
@@ -311,14 +366,17 @@ CreateThread(function()
                     ESX.ShowHelpNotification(Config.Lang.press_to_use_atm)
                     
                     if IsControlJustReleased(0, 38) then -- E
-                        PlayATMAnimation()
-                        Wait(500)
                         TriggerServerEvent('bank:server:requestOpen')
                     end
                     
                     break
                 end
             end
+        end
+        
+        -- Si on s'éloigne de l'ATM pendant l'animation
+        if wasNearATM and not nearATM and isInAnimation then
+            StopAnimation()
         end
         
         Wait(sleep)
@@ -329,7 +387,7 @@ end)
 -- PNJ 1 - Amélioration carte
 CreateThread(function()
     while true do
-        local sleep = 500
+        local sleep = 1000
         
         if Config.PNJ and Config.PNJ.Enabled then
             local ped = PlayerPedId()
@@ -353,7 +411,7 @@ end)
 -- PNJ 2 - Création compte
 CreateThread(function()
     while true do
-        local sleep = 500
+        local sleep = 1000
         
         if Config.PNJ2 and Config.PNJ2.Enabled then
             local ped = PlayerPedId()
@@ -447,17 +505,28 @@ CreateThread(function()
         Wait(0)
         
         if isUIOpen then
-            DisableControlAction(0, 1, true) -- Mouse look
-            DisableControlAction(0, 2, true) -- Mouse look
-            DisableControlAction(0, 142, true) -- MeleeAttackAlternate
-            DisableControlAction(0, 106, true) -- VehicleMouseControlOverride
+            DisableControlAction(0, 1, true)
+            DisableControlAction(0, 2, true)
+            DisableControlAction(0, 142, true)
+            DisableControlAction(0, 106, true)
             
-            if IsDisabledControlJustPressed(0, 322) or IsDisabledControlJustPressed(0, 177) then -- ESC
+            if IsDisabledControlJustPressed(0, 322) or IsDisabledControlJustPressed(0, 177) then
                 UI.Close()
             end
         else
             Wait(500)
         end
+    end
+end)
+
+-- ==================== CLEANUP À LA DÉCONNEXION ====================
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() ~= resourceName then return end
+    
+    -- Nettoyage propre
+    StopAnimation()
+    if isUIOpen then
+        UI.Close()
     end
 end)
 
@@ -469,6 +538,7 @@ if Config.Debug then
         print('Near ATM:', nearATM)
         print('Has Card:', HasCard())
         print('Current Account:', currentAccount ~= nil)
+        print('In Animation:', isInAnimation)
     end, false)
 end
 

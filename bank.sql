@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS `banking` (
   `account_id` VARCHAR(100) NOT NULL PRIMARY KEY,
   `identifier` VARCHAR(60) NOT NULL,
-  `balance` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+ `balance` BIGINT    NOT NULL DEFAULT 0
   `owner_name` VARCHAR(100) NOT NULL,
   `label` VARCHAR(100) DEFAULT 'Compte Personnel',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

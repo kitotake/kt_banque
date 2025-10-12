@@ -385,9 +385,14 @@ window.addEventListener('message', (event) => {
             setTimeout(() => document.getElementById('newPin')?.focus(), 200);
             break;
 
-        case 'updateBalance':
-            if (typeof data.balance !== 'undefined') AccountPage.updateBalance(data.balance);
-            break;
+            case 'updateBalance':
+                if (data && typeof data.balance !== 'undefined') {
+                    AccountPage.updateBalance(data.balance);
+                } else {
+                    console.warn('updateBalance reçu sans données valides :', data);
+                }
+                break;
+            
 
         case 'close':
             Navigation.closeUI();
