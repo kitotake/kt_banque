@@ -1,54 +1,67 @@
 Config = {}
 
--- Items ox_inventory pour les différents types de cartes
+-- ==================== CONFIGURATION GÉNÉRALE ====================
+Config.Debug = false
+Config.RequireCard = true
+Config.SpamDelay = 1000
+
+-- ==================== ITEMS & TYPES DE CARTES ====================
 Config.BankCardItem = {
     carte_basique = "bank_card",
-    carte_or = "bank_or",
-    carte_dimas = "bank_dimas"
+    carte_or = "bank_gold_card",
+    carte_dimas = "bank_diamond_card"
 }
 
--- Limites par type de carte
 Config.CardLimits = {
     carte_basique = { 
-        MaxDeposit = 2500, 
-        MaxWithdraw = 1000,
-        Price = 50 
+        MaxDeposit = 5000, 
+        MaxWithdraw = 20000,
+        Price = 0,  -- Gratuite à la création
+        DisplayName = "Carte Basique"
     },
     carte_or = { 
-        MaxDeposit = 4500, 
-        MaxWithdraw = 3000,
-        Price = 12500 
+        MaxDeposit = 10000, 
+        MaxWithdraw = 5000,
+        Price = 15000,
+        DisplayName = "Carte Or"
     },
     carte_dimas = { 
-        MaxDeposit = 5500, 
-        MaxWithdraw = 4500,
-        Price = 45000 
+        MaxDeposit = 50000, 
+        MaxWithdraw = 25000,
+        Price = 50000,
+        DisplayName = "Carte Diamant"
     }
 }
 
--- Configuration du PNJ banquier (Achat carte)
+-- ==================== BASE DE DONNÉES ====================
+Config.DB = {
+    banking_table = "banking",
+    bank_cards_table = "bank_cards",
+    bank_logs_table = "bank_logs"
+}
+
+-- ==================== PNJ BANQUIERS ====================
 Config.PNJ = {
     Enabled = true,
     Model = "cs_bankman",
-    Coords = vec3(254.04, 222.72, 104.25),
-    Heading = 147.0,
+    Coords = vector3(242.90, 222.07, 106.28),
+    Heading = 340.0,
     Frozen = true,
     Invincible = true,
-    Scenario = ""
+    Scenario = "WORLD_HUMAN_CLIPBOARD"
 }
 
--- Configuration du PNJ banquier (Création compte)
 Config.PNJ2 = {
     Enabled = true,
     Model = "cs_bankman",
-    Coords = vec3(249.04, 224.72, 104.25),
-    Heading = 147.0,
+    Coords = vector3(251.90, 219.07, 106.28),
+    Heading = 250.0,
     Frozen = true,
     Invincible = true,
-    Scenario = ""
+    Scenario = "WORLD_HUMAN_STAND_IMPATIENT"
 }
 
--- Modèles ATM reconnus
+-- ==================== ATM ====================
 Config.ATMModels = {
     `prop_atm_01`,
     `prop_atm_02`,
@@ -56,49 +69,35 @@ Config.ATMModels = {
     `prop_fleeca_atm`
 }
 
--- Distances d'interaction
-Config.InteractionDistance = 4.0
+Config.InteractionDistance = 2.5
 Config.ATMDistance = 1.5
 
--- Liste des blips
+-- ==================== BLIPS ====================
 Config.Blips = {
-    { label = "Banque Centrale", pos = vector3(150.266, -1040.203, 29.374), sprite = 108, color = 2, scale = 0.8 },
-    { label = "Banque Vinewood", pos = vector3(247.49, 223.15, 106.29), sprite = 108, color = 5, scale = 0.8 },
-    { label = "Banque Legion Square", pos = vector3(314.18, -278.62, 54.17), sprite = 108, color = 2, scale = 0.8 },
-    { label = "Banque Sandy Shores", pos = vector3(1175.02, 2706.64, 38.09), sprite = 108, color = 2, scale = 0.8 },
-    { label = "Banque Paleto Bay", pos = vector3(-112.20, 6469.29, 31.63), sprite = 108, color = 2, scale = 0.8 }
+    {
+        label = "Banque Centrale",
+        pos = vector3(150.266, -1040.203, 29.374),
+        sprite = 108,
+        color = 2,
+        scale = 0.8
+    },
+    {
+        label = "Banque Pacific Standard",
+        pos = vector3(247.49, 223.15, 106.29),
+        sprite = 108,
+        color = 2,
+        scale = 0.8
+    },
+    {
+        label = "Banque Legion Square",
+        pos = vector3(314.18, -278.62, 54.17),
+        sprite = 108,
+        color = 2,
+        scale = 0.8
+    }
 }
 
--- Configuration base de données
-Config.DB = {
-    banking_table = "banking",
-    bank_cards_table = "bank_cards",
-    bank_logs_table = "bank_logs"
-}
-
--- Nécessite d'avoir la carte pour utiliser le système
-Config.RequireCard = true
-
--- Délai anti-spam (en millisecondes)
-Config.SpamDelay = 1000
-
--- Messages de notification
-Config.Notifications = {
-    no_card = "Aucune carte bancaire trouvée dans votre inventaire",
-    card_created = "Compte créé avec succès ! Carte ajoutée à votre inventaire",
-    invalid_pin = "Code PIN invalide (4 chiffres requis)",
-    incorrect_pin = "Code PIN incorrect",
-    deposit_success = "Dépôt de $%s effectué avec succès",
-    withdraw_success = "Retrait de $%s effectué avec succès",
-    transfer_success = "Transfert de $%s effectué avec succès",
-    insufficient_balance = "Solde insuffisant sur votre compte",
-    insufficient_cash = "Argent liquide insuffisant",
-    limit_exceeded = "Limite dépassée pour votre type de carte",
-    target_not_found = "Compte destinataire introuvable",
-    error = "Une erreur est survenue"
-}
-
--- Animation lors des transactions ATM
+-- ==================== ANIMATIONS ====================
 Config.Animations = {
     enabled = true,
     dict = "amb@prop_human_atm@male@enter",
@@ -106,7 +105,32 @@ Config.Animations = {
     flag = 1
 }
 
--- Debug mode
-Config.RequireCard = true       -- Nécessite une carte pour utiliser le système
-Config.Debug = false            -- Mode debug (logs détaillés)
-Config.SpamDelay = 1000        -- Délai anti-spam en ms
+-- ==================== MESSAGES ====================
+Config.Lang = {
+    -- Succès
+    account_created = "✅ Compte bancaire créé avec succès !",
+    deposit_success = "✅ Dépôt de $%s effectué",
+    withdraw_success = "✅ Retrait de $%s effectué",
+    transfer_success = "✅ Transfert de $%s effectué",
+    card_upgraded = "✅ Carte améliorée avec succès !",
+    
+    -- Erreurs
+    no_card = "❌ Aucune carte bancaire dans votre inventaire",
+    no_account = "❌ Vous n'avez pas de compte bancaire",
+    account_exists = "⚠️ Vous avez déjà un compte bancaire",
+    invalid_pin = "❌ Le PIN doit contenir 4 chiffres",
+    incorrect_pin = "❌ Code PIN incorrect",
+    insufficient_balance = "❌ Solde insuffisant",
+    insufficient_cash = "❌ Argent liquide insuffisant",
+    limit_exceeded = "❌ Limite dépassée pour votre carte",
+    target_not_found = "❌ Compte destinataire introuvable",
+    same_account = "❌ Vous ne pouvez pas transférer sur votre propre compte",
+    invalid_amount = "❌ Montant invalide",
+    
+    -- Interactions
+    press_to_use_atm = "Appuyez sur ~INPUT_CONTEXT~ pour utiliser le ATM",
+    press_to_create_account = "Appuyez sur ~INPUT_CONTEXT~ pour ouvrir un compte",
+    press_to_upgrade_card = "Appuyez sur ~INPUT_CONTEXT~ pour améliorer votre carte"
+}
+
+print('^2[KT Banque]^7 Configuration chargée')
