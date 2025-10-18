@@ -188,7 +188,7 @@ const PinPage = {
     }
 };
 
-// ==================== PAGE CRÉATION ====================
+// ==================== PAGWE CRÉATION ====================
 const CreatePage = {
     init() {
         const createBtn = document.getElementById('createBtn');

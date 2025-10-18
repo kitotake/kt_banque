@@ -1,4 +1,4 @@
--- ==================== INITIALISATION ====================
+-- ==================== KT BANQUE - SERVER MAIN (v7.2) ====================
 ESX = exports["es_extended"]:getSharedObject()
 
 -- Variables globales

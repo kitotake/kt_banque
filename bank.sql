@@ -30,6 +30,32 @@ CREATE TABLE IF NOT EXISTS `bank_cards` (
   FOREIGN KEY (`account_id`) REFERENCES `banking`(`account_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ==================== TABLE DES LIMITES QUOTIDIENNES ====================
+
+CREATE TABLE IF NOT EXISTS `bank_daily_limits` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `identifier` VARCHAR(60) NOT NULL,
+  `account_id` VARCHAR(100) DEFAULT NULL,
+  `total_deposit` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `total_withdraw` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `last_reset` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  -- Liens & intégrité
+  CONSTRAINT `fk_daily_limits_account`
+    FOREIGN KEY (`account_id`) REFERENCES `banking`(`account_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+
+  -- Index optimisés
+  INDEX `idx_identifier` (`identifier`),
+  INDEX `idx_account` (`account_id`),
+  INDEX `idx_last_reset` (`last_reset`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================== COMMENTAIRES ====================
+ALTER TABLE `bank_daily_limits` COMMENT = 'Table des limites de dépôt/retrait par joueur (réinitialisée toutes les 24h)';
+
+
 -- Table des logs/historique
 CREATE TABLE IF NOT EXISTS `bank_logs` (
   `id` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
