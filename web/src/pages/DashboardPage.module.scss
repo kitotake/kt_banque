@@ -1,0 +1,538 @@
+// ==================== DASHBOARD STYLES ====================
+@use '../styles/_tokens.scss' as *;
+
+.root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn $t-med ease both;
+}
+
+.shell {
+  width: 860px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr;
+  background: $surface-1;
+  border: 1px solid $border-dim;
+  border-radius: $r-xl;
+  box-shadow: $shadow-card, $shadow-glow;
+  overflow: hidden;
+  animation: slideUp 0.4s $ease-spring both;
+  position: relative;
+}
+
+// ==================== SIDEBAR ====================
+.sidebar {
+  grid-row: 1 / 3;
+  background: $surface-2;
+  border-right: 1px solid $border-dim;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 20px;
+  gap: 4px;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, $gold 60%, transparent);
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 24px;
+  border-bottom: 1px solid $border-dim;
+  margin-bottom: 12px;
+
+  &__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: $gold-dim;
+    border: 1px solid rgba($gold,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  &__name {
+    font-family: $font-display;
+    font-size: 16px;
+    font-weight: 700;
+    color: $text-1;
+    letter-spacing: -0.2px;
+  }
+
+  &__version {
+    font-size: 10px;
+    color: $text-3;
+    font-family: $font-mono;
+  }
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: $r-md;
+  cursor: pointer;
+  transition: all $t-fast ease;
+  border: 1px solid transparent;
+  color: $text-2;
+  font-size: 14px;
+  font-weight: 500;
+
+  &__icon { font-size: 16px; flex-shrink: 0; }
+
+  &:hover {
+    background: $surface-3;
+    color: $text-1;
+  }
+
+  &--active {
+    background: $gold-dim;
+    border-color: rgba($gold, 0.2);
+    color: $gold-light;
+    font-weight: 600;
+  }
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid $border-dim;
+}
+
+.close-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: $r-md;
+  border: 1px solid rgba($red, 0.2);
+  background: rgba($red, 0.08);
+  color: $red;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all $t-fast ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover {
+    background: rgba($red, 0.15);
+    border-color: rgba($red, 0.35);
+  }
+}
+
+// ==================== TOPBAR ====================
+.topbar {
+  grid-column: 2;
+  background: $surface-1;
+  border-bottom: 1px solid $border-dim;
+  padding: 18px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar-title {
+  font-family: $font-display;
+  font-size: 18px;
+  font-weight: 700;
+  color: $text-1;
+  letter-spacing: -0.3px;
+}
+
+.account-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-radius: 99px;
+  border: 1px solid $border-dim;
+  background: $surface-2;
+  font-size: 13px;
+  color: $text-2;
+
+  &__num {
+    font-family: $font-mono;
+    font-size: 12px;
+  }
+
+  &__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: $green;
+    box-shadow: 0 0 8px $green-glow;
+  }
+}
+
+// ==================== CONTENT AREA ====================
+.content {
+  grid-column: 2;
+  overflow-y: auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+// ==================== BALANCE CARD ====================
+.balance-card {
+  border-radius: $r-lg;
+  padding: 28px;
+  background: $surface-2;
+  border: 1px solid $border-dim;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -40%; right: -20%;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba($gold, 0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  // Scanline effect
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba($gold,0.4), transparent);
+    animation: scanline 4s linear infinite;
+  }
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.card-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 1px solid;
+
+  &--carte_basique {
+    background: rgba($cyan, 0.08);
+    border-color: rgba($cyan, 0.25);
+    color: $cyan;
+  }
+  &--carte_or {
+    background: $gold-dim;
+    border-color: rgba($gold, 0.35);
+    color: $gold-light;
+  }
+  &--carte_dimas {
+    background: rgba(167,139,250,0.1);
+    border-color: rgba(167,139,250,0.3);
+    color: #c4b5fd;
+  }
+}
+
+.card-number {
+  font-family: $font-mono;
+  font-size: 12px;
+  color: $text-3;
+  letter-spacing: 2px;
+}
+
+.balance-label {
+  font-size: 12px;
+  color: $text-2;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.balance-amount {
+  font-family: $font-display;
+  font-size: 44px;
+  font-weight: 800;
+  color: $text-1;
+  letter-spacing: -2px;
+  line-height: 1;
+
+  &--updated {
+    animation: balancePop 0.5s $ease-spring;
+  }
+}
+
+.card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid $border-dim;
+}
+
+.card-owner {
+  font-size: 13px;
+  color: $text-2;
+  font-weight: 500;
+}
+
+.card-limits {
+  display: flex;
+  gap: 16px;
+}
+
+.limit-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+
+  &__label {
+    font-size: 10px;
+    color: $text-3;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  &__val {
+    font-family: $font-mono;
+    font-size: 13px;
+    font-weight: 500;
+    color: $text-2;
+  }
+}
+
+// ==================== ACTIONS GRID ====================
+.section-title {
+  font-family: $font-display;
+  font-size: 13px;
+  font-weight: 700;
+  color: $text-2;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.action-card {
+  background: $surface-2;
+  border: 1px solid $border-dim;
+  border-radius: $r-lg;
+  padding: 20px;
+  transition: all $t-fast ease;
+
+  &:hover {
+    border-color: $border-glow;
+    background: $surface-3;
+  }
+
+  &--transfer {
+    grid-column: 1 / -1;
+  }
+}
+
+.action-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+
+  &__icon { font-size: 18px; }
+
+  &__title {
+    font-family: $font-display;
+    font-size: 15px;
+    font-weight: 600;
+    color: $text-1;
+  }
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.action-input {
+  flex: 1;
+  padding: 11px 14px;
+  border-radius: $r-md;
+  border: 1.5px solid $border-dim;
+  background: $surface-1;
+  color: $text-1;
+  font-family: $font-mono;
+  font-size: 14px;
+  transition: all $t-fast ease;
+
+  &::placeholder { color: $text-3; font-size: 13px; font-family: $font-body; }
+
+  &:focus {
+    outline: none;
+    border-color: rgba($gold, 0.4);
+    background: $surface-2;
+    box-shadow: 0 0 0 3px rgba($gold, 0.08);
+  }
+}
+
+.action-btn {
+  padding: 11px 18px;
+  border-radius: $r-md;
+  border: none;
+  font-family: $font-display;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all $t-fast ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:active { transform: scale(0.96); }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  &--deposit {
+    background: linear-gradient(135deg, $green, darken($green, 8%));
+    color: $black;
+    box-shadow: 0 3px 12px $green-glow;
+    &:hover:not(:disabled) {
+      box-shadow: 0 5px 20px rgba($green, 0.5);
+      transform: translateY(-1px);
+    }
+  }
+
+  &--withdraw {
+    background: linear-gradient(135deg, $amber, darken($amber, 10%));
+    color: $black;
+    box-shadow: 0 3px 12px $amber-dim;
+    &:hover:not(:disabled) {
+      box-shadow: 0 5px 18px rgba($amber, 0.4);
+      transform: translateY(-1px);
+    }
+  }
+
+  &--transfer {
+    background: linear-gradient(135deg, $cyan, darken($cyan, 10%));
+    color: $black;
+    box-shadow: 0 3px 12px $cyan-glow;
+    &:hover:not(:disabled) {
+      box-shadow: 0 5px 18px rgba($cyan, 0.45);
+      transform: translateY(-1px);
+    }
+  }
+}
+
+// ==================== HISTORY ====================
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tx-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: $r-md;
+  transition: background $t-fast ease;
+  cursor: default;
+
+  &:hover { background: $surface-2; }
+}
+
+.tx-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+
+  &--positive { background: $green-dim; }
+  &--negative { background: $red-dim; }
+  &--neutral  { background: $cyan-dim; }
+}
+
+.tx-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.tx-action {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tx-desc {
+  font-size: 11px;
+  color: $text-3;
+  margin-top: 2px;
+}
+
+.tx-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.tx-amount {
+  font-family: $font-mono;
+  font-size: 14px;
+  font-weight: 600;
+
+  &--positive { color: $green; }
+  &--negative { color: $red; }
+}
+
+.tx-date {
+  font-size: 11px;
+  color: $text-3;
+  margin-top: 2px;
+}
+
+.history-empty {
+  text-align: center;
+  color: $text-3;
+  font-size: 13px;
+  padding: 32px 0;
+  font-style: italic;
+}
