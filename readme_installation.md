@@ -1,13 +1,13 @@
 # 🏦 KT Banque - Système Bancaire Complet
 
-Système bancaire moderne pour FiveM avec support ox_lib et ox_inventory.
+Système bancaire moderne pour FiveM avec support kt_lib et kt_inventory.
 
 ## 📋 Prérequis
 
-- ✅ ESX Legacy
+- ✅ union
 - ✅ oxmysql
-- ✅ ox_lib
-- ✅ ox_inventory
+- ✅ kt_lib
+- ✅ kt_inventory
 
 ## 🚀 Installation
 
@@ -18,27 +18,27 @@ Exécutez le fichier SQL dans votre base de données:
 banking_schema.sql
 ```
 
-### 2️⃣ Items ox_inventory
+### 2️⃣ Items kt_inventory
 
-Ajoutez les items dans `ox_inventory/data/items.lua`:
+Ajoutez les items dans `kt_inventory/data/items.lua`:
 ```lua
--- Copiez le contenu de ox_inventory_items.lua
+-- Copiez le contenu de kt_inventory_items.lua
 ```
 
 ### 3️⃣ Images des Cartes
 
-Placez les images suivantes dans `ox_inventory/web/images/`:
+Placez les images suivantes dans `kt_inventory/web/images/`:
 - `bank_card.png` - Carte basique
-- `bank_or.png` - Carte or
-- `bank_dimas.png` - Carte diamant
+- `bank_gold_card.png` - Carte or
+- `bank_diamond_card.png` - Carte diamant
 
 ### 4️⃣ Ressource
 
 1. Placez le dossier `kt_banque` dans votre dossier `resources/`
 2. Ajoutez dans votre `server.cfg`:
 ```cfg
-ensure ox_lib
-ensure ox_inventory
+ensure kt_lib
+ensure kt_inventory
 ensure kt_banque
 ```
 
@@ -177,13 +177,13 @@ exports['kt_banque']:AdminSetBalance(accountId, amount)
 ## 🐛 Dépannage
 
 ### Le NUI ne s'ouvre pas
-1. Vérifiez que `ox_lib` est bien démarré avant `kt_banque`
+1. Vérifiez que `kt_lib` est bien démarré avant `kt_banque`
 2. Vérifiez la console F8 pour les erreurs JavaScript
 3. Activez le mode debug: `Config.Debug = true`
 
 ### Les cartes n'apparaissent pas dans l'inventaire
-1. Vérifiez que les items sont bien ajoutés dans ox_inventory
-2. Redémarrez ox_inventory après avoir ajouté les items
+1. Vérifiez que les items sont bien ajoutés dans kt_inventory
+2. Redémarrez kt_inventory après avoir ajouté les items
 3. Vérifiez les noms des items dans `Config.BankCardItem`
 
 ### Les PNJ ne spawn pas
@@ -201,8 +201,8 @@ exports['kt_banque']:AdminSetBalance(accountId, amount)
 faut debug les pages web pour voir les erreurs acheta des carte pas possible
 
 ### Version 6.5.0
-- ✅ Intégration complète ox_lib
-- ✅ Support ox_inventory
+- ✅ Intégration complète kt_lib
+- ✅ Support kt_inventory
 - ✅ Système de cartes améliorées
 - ✅ Interface NUI moderne
 - ✅ Système de logs détaillé

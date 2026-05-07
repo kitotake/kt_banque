@@ -17,7 +17,7 @@ end
 
 local function HasCard()
     for _, item in pairs(Config.BankCardItem) do
-        if exports.ox_inventory:GetItemCount(item) > 0 then
+        if exports.kt_inventory:GetItemCount(item) > 0 then
             return true
         end
     end

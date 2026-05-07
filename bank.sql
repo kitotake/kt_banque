@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `bank_accounts` (
     `account_number`   VARCHAR(10)  NOT NULL,
     `unique_id`        VARCHAR(36)  NOT NULL,
     `owner_identifier` VARCHAR(60)  NOT NULL,
-
+    `iban`             VARCHAR(34)  NOT NULL UNIQUE,
     `label`    VARCHAR(100) DEFAULT 'Compte Personnel',
     `type`     ENUM('personal','business','shared') DEFAULT 'personal',
     `balance`  BIGINT       NOT NULL DEFAULT 0,
