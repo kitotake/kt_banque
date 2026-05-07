@@ -14,7 +14,9 @@ export function useNUIMessage() {
       switch (action) {
         // FIX: aligné avec l'event serveur 'bank:client:openBank'
         case 'openBank':
-          dispatch({ type: 'OPEN_BANK', payload: data as AccountData });
+          if (data) {
+            dispatch({ type: 'OPEN_BANK', payload: data as AccountData });
+          }
           break;
 
         // FIX: aligné avec 'bank:client:openCreate'

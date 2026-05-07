@@ -1,10 +1,12 @@
--- kt_banque/server/card_recovery.lua
-
 local RECOVERY_COST = 1000
+local MySQL = exports.oxmysql
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- RECOVER CARD
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RegisterNetEvent("kt_banque:card:recover", function()
-    local src    = source
-    local player = PlayerManager.get(src)
+    local src = source
+    local player = exports['union']:GetPlayerFromId(src)
 
     if not player or not player.currentCharacter then
         TriggerClientEvent("kt_banque:card:recoverResult", src, false, "Aucun personnage actif.")
@@ -13,76 +15,71 @@ RegisterNetEvent("kt_banque:card:recover", function()
 
     local uid = player.currentCharacter.unique_id
 
-    -- 1. Vérifier que la carte existe et est bien bloquée
-    Database.fetchOne([[
-        SELECT bc.id, bc.active, bc.expires_at
-        FROM bank_cards bc
-        WHERE bc.unique_id = ?
+    -- Get latest card
+    MySQL:single([[
+        SELECT id, active, expires_at
+        FROM bank_cards
+        WHERE unique_id = ?
+        ORDER BY id DESC
         LIMIT 1
     ]], { uid }, function(card)
 
         if not card then
-            TriggerClientEvent("kt_banque:card:recoverResult", src, false,
-                "Aucune carte bancaire trouvée sur ce compte.")
+            TriggerClientEvent("kt_banque:card:recoverResult", src, false, "Aucune carte trouvée.")
             return
         end
 
-        if card.active == 1 then
-            TriggerClientEvent("kt_banque:card:recoverResult", src, false,
-                "Votre carte est déjà active.")
+        if tonumber(card.active) == 1 then
+            TriggerClientEvent("kt_banque:card:recoverResult", src, false, "Votre carte est déjà active.")
             return
         end
 
-        -- 2. Vérifier expiration
-        -- (optionnel : si expirée on refuse et on propose d'en émettre une nouvelle)
-        -- Pour l'instant on réactive même si expirée et on repousse la date
-
-        -- 3. Vérifier le solde
+        -- Balance check
         Bank.getBalance(uid, function(balance)
+
             if balance < RECOVERY_COST then
                 TriggerClientEvent("kt_banque:card:recoverResult", src, false,
-                    string.format("Solde insuffisant. Coût : $%d | Votre solde : $%d",
-                        RECOVERY_COST, balance))
+                    ("Solde insuffisant ($%d / $%d)"):format(balance, RECOVERY_COST))
                 return
             end
 
-            -- 4. Débiter
-            Bank.withdraw(uid, RECOVERY_COST, "Remplacement carte bancaire", function(success)
+            -- Withdraw
+            Bank.withdraw(uid, RECOVERY_COST, "Récupération carte bancaire", function(success)
+
                 if not success then
-                    TriggerClientEvent("kt_banque:card:recoverResult", src, false,
-                        "Erreur lors du paiement.")
+                    TriggerClientEvent("kt_banque:card:recoverResult", src, false, "Erreur paiement.")
                     return
                 end
 
-                -- 5. Réactiver la carte + repousser expiration d'1 an
-                Database.execute([[
+                -- Safe update (anti double execute)
+                MySQL:execute([[
                     UPDATE bank_cards
-                    SET active     = 1,
-                        expires_at = DATE_ADD(NOW(), INTERVAL 1 YEAR)
+                    SET active = 1,
+                        expires_at = DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
                     WHERE id = ?
+                    AND active = 0
                 ]], { card.id }, function(result)
-                    local affected = type(result) == "table"
-                        and (result.affectedRows or 0) or (result or 0)
 
-                    if affected and affected > 0 then
-                        Logger:info(string.format(
-                            "[BANQUE] %s a récupéré sa carte bancaire pour $%d",
-                            player.name, RECOVERY_COST
-                        ))
+                    local affected = result and result.affectedRows or 0
 
-                        -- Log en bank_logs
-                        Database.execute(
+                    if affected > 0 then
+
+                        Logger:info(("[BANQUE] %s a récupéré sa carte ($%d)"):format(player.name, RECOVERY_COST))
+
+                        MySQL:execute(
                             "INSERT INTO bank_logs (unique_id, action, details) VALUES (?, ?, ?)",
-                            { uid, "card_recovery", string.format("Carte #%d réactivée pour $%d", card.id, RECOVERY_COST) },
-                            function() end
+                            {
+                                uid,
+                                "card_recovery",
+                                ("Carte #%d réactivée"):format(card.id)
+                            }
                         )
 
-                        TriggerClientEvent("kt_banque:card:recoverResult", src, true, nil)
+                        TriggerClientEvent("kt_banque:card:recoverResult", src, true)
+
                     else
-                        -- Remboursement si l'UPDATE échoue
-                        Bank.deposit(uid, RECOVERY_COST, "Remboursement récupération carte", function() end)
-                        TriggerClientEvent("kt_banque:card:recoverResult", src, false,
-                            "Erreur lors de la réactivation. Vous avez été remboursé.")
+                        Bank.deposit(uid, RECOVERY_COST, "Rollback récupération carte", function() end)
+                        TriggerClientEvent("kt_banque:card:recoverResult", src, false, "Erreur réactivation.")
                     end
                 end)
             end)
@@ -90,24 +87,33 @@ RegisterNetEvent("kt_banque:card:recover", function()
     end)
 end)
 
-
--- Vérifie le statut de la carte (appelé à l'ouverture du menu banque)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- CHECK STATUS
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RegisterNetEvent("kt_banque:card:checkStatus", function()
-    local src    = source
-    local player = PlayerManager.get(src)
+    local src = source
+    local player = exports['union']:GetPlayerFromId(src)
+
     if not player or not player.currentCharacter then return end
 
     local uid = player.currentCharacter.unique_id
 
-    Database.fetchOne([[
+    MySQL:single([[
         SELECT
-            bc.id, bc.card_number, bc.type, bc.active, bc.expires_at,
-            ba.balance, ba.status AS account_status, ba.iban
+            bc.id,
+            bc.card_number,
+            bc.type,
+            bc.active,
+            bc.expires_at,
+            ba.balance,
+            ba.status,
+            ba.iban
         FROM bank_cards bc
         JOIN bank_accounts ba ON ba.id = bc.account_id
         WHERE bc.unique_id = ?
+        ORDER BY bc.id DESC
         LIMIT 1
     ]], { uid }, function(data)
-        TriggerClientEvent("kt_banque:card:statusReceived", src, data or nil)
+        TriggerClientEvent("kt_banque:card:statusReceived", src, data)
     end)
 end)

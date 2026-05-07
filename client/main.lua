@@ -140,7 +140,6 @@ end)
 -- end)
 
 -- ==================== ÉVÉNEMENTS SERVEUR ====================
-
 RegisterNetEvent('bank:client:openBank', function(data)
     UI.Open(data)
 end)
