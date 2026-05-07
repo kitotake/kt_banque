@@ -1,4 +1,4 @@
-// ==================== KT BANQUE - useNotification hook ====================
+// ==================== KT BANQUE v7.4.1 - useNotification hook ====================
 import { useCallback } from 'react';
 import { useAppStore } from '../store';
 import { NotificationType } from '../types';

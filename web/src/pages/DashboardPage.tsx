@@ -1,5 +1,11 @@
-// ==================== KT BANQUE - Dashboard ====================
-import { useState, useCallback, useRef } from 'react';
+// ==================== KT BANQUE v7.4.1 - Dashboard ====================
+// Corrections :
+//   • useRef supprimé (inutilisé)
+//   • PIN jamais envoyé : on envoie pin_hash depuis le store
+//   • Guard null sur data.card_meta avant rendu
+//   • account_id affiché correctement
+
+import { useState, useCallback } from 'react';
 import { useAppStore } from '../store';
 import { useNotification } from '../hooks/useNotification';
 import { useClose } from '../hooks/useNUI';
@@ -7,34 +13,34 @@ import { sendToServer, formatCurrency, formatDate, maskCardNumber, cardTypeLabel
 import { Transaction, TransactionType } from '../types';
 import styles from './DashboardPage.module.scss';
 
-// ---- helpers ----
+// ---- Types internes ----
 type NavTab = 'operations' | 'history';
 
-const TX_ICONS: Record<TransactionType | string, string> = {
-  deposit:         '⬆',
-  withdraw:        '⬇',
-  transfer_out:    '→',
-  transfer_in:     '←',
+const TX_ICONS: Record<string, string> = {
+  deposit        : '⬆',
+  withdraw       : '⬇',
+  transfer_out   : '→',
+  transfer_in    : '←',
   account_created: '✦',
-  card_issued:     '◆',
-  admin:           '⚙',
+  card_issued    : '◆',
+  admin          : '⚙',
 };
+
 const TX_LABELS: Record<string, string> = {
-  deposit:         'Dépôt',
-  withdraw:        'Retrait',
-  transfer_out:    'Virement émis',
-  transfer_in:     'Virement reçu',
+  deposit        : 'Dépôt',
+  withdraw       : 'Retrait',
+  transfer_out   : 'Virement émis',
+  transfer_in    : 'Virement reçu',
   account_created: 'Création compte',
-  card_issued:     'Carte émise',
-  admin:           'Opération admin',
+  card_issued    : 'Carte émise',
+  admin          : 'Opération admin',
 };
-const POSITIVE_TYPES: TransactionType[] = ['deposit', 'transfer_in', 'account_created'];
 
-// ==================== SUB-COMPONENTS ====================
+const POSITIVE_TYPES: TransactionType[] = ['deposit', 'transfer_in', 'account_created', 'card_issued'];
 
+// ==================== BALANCE CARD ====================
 function BalanceCard() {
   const { state } = useAppStore();
-  const [pop, setPop] = useState(false);
   const data = state.accountData!;
 
   return (
@@ -43,11 +49,13 @@ function BalanceCard() {
         <span className={`${styles['card-type-badge']} ${styles[`card-type-badge--${data.card_meta.card_type}`]}`}>
           {cardTypeLabel(data.card_meta.card_type)}
         </span>
-        <span className={styles ['card-number']}>{maskCardNumber(data.card_meta.card_number)}</span>
+        <span className={styles['card-number']}>
+          {maskCardNumber(data.card_meta.card_number)}
+        </span>
       </div>
 
       <div className={styles['balance-label']}>Solde disponible</div>
-      <div className={`${styles['balance-amount']} ${pop ? styles['balance-amount--updated'] : ''}`}>
+      <div className={styles['balance-amount']}>
         {formatCurrency(data.balance)}
       </div>
 
@@ -55,11 +63,11 @@ function BalanceCard() {
         <span className={styles['card-owner']}>{data.card_meta.owner}</span>
         <div className={styles['card-limits']}>
           <div className={styles['limit-chip']}>
-            <span className={styles['limit-chip__label']}>Dépôt max</span>
+            <span className={styles['limit-chip__label']}>Dépôt max/j</span>
             <span className={styles['limit-chip__val']}>{formatCurrency(data.limits.MaxDeposit)}</span>
           </div>
           <div className={styles['limit-chip']}>
-            <span className={styles['limit-chip__label']}>Retrait max</span>
+            <span className={styles['limit-chip__label']}>Retrait max/j</span>
             <span className={styles['limit-chip__val']}>{formatCurrency(data.limits.MaxWithdraw)}</span>
           </div>
         </div>
@@ -68,16 +76,19 @@ function BalanceCard() {
   );
 }
 
+// ==================== OPERATIONS ====================
 function OperationsPanel() {
   const { state } = useAppStore();
   const notify = useNotification();
-  const [depositAmt, setDepositAmt] = useState('');
-  const [withdrawAmt, setWithdrawAmt] = useState('');
-  const [transferAmt, setTransferAmt] = useState('');
-  const [transferTarget, setTransferTarget] = useState('');
-  const [loading, setLoading] = useState<string | null>(null);
+  const [depositAmt,    setDepositAmt]    = useState('');
+  const [withdrawAmt,   setWithdrawAmt]   = useState('');
+  const [transferAmt,   setTransferAmt]   = useState('');
+  const [transferTarget,setTransferTarget]= useState('');
+  const [loading,       setLoading]       = useState<string | null>(null);
 
   const data = state.accountData!;
+  // FIX: on utilise pin_hash depuis le store, jamais le PIN brut
+  const pinHash = data.pin_hash;
 
   const wrap = useCallback(async (
     key: string,
@@ -90,7 +101,7 @@ function OperationsPanel() {
       await sendToServer(event, payload);
       notify(successMsg, 'success');
     } catch {
-      notify('Erreur serveur', 'error');
+      notify('Erreur serveur — réessayez', 'error');
     } finally {
       setLoading(null);
     }
@@ -100,6 +111,7 @@ function OperationsPanel() {
     <div>
       <p className={styles['section-title']}>Opérations</p>
       <div className={styles['actions-grid']}>
+
         {/* Dépôt */}
         <div className={styles['action-card']}>
           <div className={styles['action-header']}>
@@ -113,17 +125,15 @@ function OperationsPanel() {
               min={1}
               placeholder="Montant"
               value={depositAmt}
-              onChange={e => setDepositAmt(e.target.value)}
+              onChange={(e) => setDepositAmt(e.target.value)}
             />
             <button
               className={`${styles['action-btn']} ${styles['action-btn--deposit']}`}
-              disabled={!depositAmt || loading === 'deposit'}
+              disabled={!depositAmt || Number(depositAmt) <= 0 || loading === 'deposit'}
               onClick={() => {
-                wrap('deposit', 'deposit', {
-                  amount: parseFloat(depositAmt),
-                  cardId: data.card_meta.id,
-                  pin: data.pin,
-                }, `Dépôt de ${formatCurrency(parseFloat(depositAmt))} effectué`);
+                const amount = parseFloat(depositAmt);
+                wrap('deposit', 'deposit', { amount, pinHash },
+                  `Dépôt de ${formatCurrency(amount)} effectué`);
                 setDepositAmt('');
               }}
             >
@@ -145,17 +155,15 @@ function OperationsPanel() {
               min={1}
               placeholder="Montant"
               value={withdrawAmt}
-              onChange={e => setWithdrawAmt(e.target.value)}
+              onChange={(e) => setWithdrawAmt(e.target.value)}
             />
             <button
               className={`${styles['action-btn']} ${styles['action-btn--withdraw']}`}
-              disabled={!withdrawAmt || loading === 'withdraw'}
+              disabled={!withdrawAmt || Number(withdrawAmt) <= 0 || loading === 'withdraw'}
               onClick={() => {
-                wrap('withdraw', 'withdraw', {
-                  amount: parseFloat(withdrawAmt),
-                  cardId: data.card_meta.id,
-                  pin: data.pin,
-                }, `Retrait de ${formatCurrency(parseFloat(withdrawAmt))} effectué`);
+                const amount = parseFloat(withdrawAmt);
+                wrap('withdraw', 'withdraw', { amount, pinHash },
+                  `Retrait de ${formatCurrency(amount)} effectué`);
                 setWithdrawAmt('');
               }}
             >
@@ -168,15 +176,15 @@ function OperationsPanel() {
         <div className={`${styles['action-card']} ${styles['action-card--transfer']}`}>
           <div className={styles['action-header']}>
             <span className={styles['action-header__icon']}>⇄</span>
-            <span className={styles['action-header__title']}>Transférer</span>
+            <span className={styles['action-header__title']}>Virement</span>
           </div>
           <div className={styles['input-row']}>
             <input
               className={styles['action-input']}
               type="text"
-              placeholder="N° de compte destinataire"
+              placeholder="N° de compte (ex: UN12345678)"
               value={transferTarget}
-              onChange={e => setTransferTarget(e.target.value)}
+              onChange={(e) => setTransferTarget(e.target.value.toUpperCase())}
               style={{ flex: 2 }}
             />
             <input
@@ -185,18 +193,15 @@ function OperationsPanel() {
               min={1}
               placeholder="Montant"
               value={transferAmt}
-              onChange={e => setTransferAmt(e.target.value)}
+              onChange={(e) => setTransferAmt(e.target.value)}
             />
             <button
               className={`${styles['action-btn']} ${styles['action-btn--transfer']}`}
-              disabled={!transferAmt || !transferTarget || loading === 'transfer'}
+              disabled={!transferAmt || !transferTarget || Number(transferAmt) <= 0 || loading === 'transfer'}
               onClick={() => {
-                wrap('transfer', 'transfer', {
-                  amount: parseFloat(transferAmt),
-                  target: transferTarget,
-                  cardId: data.card_meta.id,
-                  pin: data.pin,
-                }, `Virement de ${formatCurrency(parseFloat(transferAmt))} envoyé`);
+                const amount = parseFloat(transferAmt);
+                wrap('transfer', 'transfer', { amount, target: transferTarget, pinHash },
+                  `Virement de ${formatCurrency(amount)} envoyé`);
                 setTransferAmt('');
                 setTransferTarget('');
               }}
@@ -205,11 +210,13 @@ function OperationsPanel() {
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
 }
 
+// ==================== HISTORIQUE ====================
 function HistoryPanel({ history }: { history: Transaction[] }) {
   if (!history.length)
     return <p className={styles['history-empty']}>Aucune transaction récente</p>;
@@ -219,11 +226,11 @@ function HistoryPanel({ history }: { history: Transaction[] }) {
       {history.map((tx) => {
         const isPos = POSITIVE_TYPES.includes(tx.action as TransactionType);
         const isNeu = ['account_created', 'card_issued'].includes(tx.action);
-        const iconClass = isNeu ? styles['tx-icon--neutral'] : isPos ? styles['tx-icon--positive'] : styles['tx-icon--negative'];
+        const iconClass   = isNeu ? styles['tx-icon--neutral'] : isPos ? styles['tx-icon--positive'] : styles['tx-icon--negative'];
         const amountClass = isPos ? styles['tx-amount--positive'] : styles['tx-amount--negative'];
-        const sign = isPos ? '+' : '-';
+        const sign  = isPos ? '+' : '-';
         const label = TX_LABELS[tx.action] ?? tx.action;
-        const icon = TX_ICONS[tx.action] ?? '•';
+        const icon  = TX_ICONS[tx.action]  ?? '•';
 
         return (
           <div key={tx.id} className={styles['tx-item']}>
@@ -245,32 +252,43 @@ function HistoryPanel({ history }: { history: Transaction[] }) {
   );
 }
 
-// ==================== MAIN DASHBOARD ====================
+// ==================== DASHBOARD PRINCIPAL ====================
 const NAV = [
   { id: 'operations' as NavTab, label: 'Opérations', icon: '◈' },
-  { id: 'history' as NavTab,    label: 'Historique',  icon: '⊟' },
+  { id: 'history'    as NavTab, label: 'Historique',  icon: '⊟' },
 ] as const;
 
 export function DashboardPage() {
   const { state } = useAppStore();
   const close = useClose();
   const [tab, setTab] = useState<NavTab>('operations');
-  const data = state.accountData!;
+
+  const data = state.accountData;
+
+  // Guard : si accountData n'est pas encore chargé
+  if (!data || !data.card_meta) {
+    return (
+      <div className={styles.root}>
+        <div style={{ color: 'white', textAlign: 'center' }}>Chargement…</div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.root}>
       <div className={styles.shell}>
+
         {/* SIDEBAR */}
         <aside className={styles.sidebar}>
           <div className={styles.brand}>
             <div className={styles.brand__icon}>🏦</div>
             <div>
               <div className={styles.brand__name}>KT Banque</div>
-              <div className={styles.brand__version}>v7.3</div>
+              <div className={styles.brand__version}>v7.4</div>
             </div>
           </div>
 
-          {NAV.map(item => (
+          {NAV.map((item) => (
             <div
               key={item.id}
               className={`${styles['nav-item']} ${tab === item.id ? styles['nav-item--active'] : ''}`}
@@ -301,11 +319,12 @@ export function DashboardPage() {
           </div>
         </header>
 
-        {/* CONTENT */}
+        {/* CONTENU */}
         <main className={styles['content']}>
           <BalanceCard />
 
           {tab === 'operations' && <OperationsPanel />}
+
           {tab === 'history' && (
             <div>
               <p className={styles['section-title']}>Transactions récentes</p>
@@ -313,6 +332,7 @@ export function DashboardPage() {
             </div>
           )}
         </main>
+
       </div>
     </div>
   );

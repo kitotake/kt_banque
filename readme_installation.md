@@ -1,223 +1,184 @@
-# 🏦 KT Banque - Système Bancaire Complet
+# 🏦 KT Banque v7.4.1 — Système Bancaire FiveM
 
-Système bancaire moderne pour FiveM avec support kt_lib et kt_inventory.
+Système bancaire complet pour FiveM avec interface NUI React, gestion des cartes, limites journalières et transferts sécurisés.
+
+---
 
 ## 📋 Prérequis
 
-- ✅ union
-- ✅ oxmysql
-- ✅ kt_lib
-- ✅ kt_inventory
+| Ressource      | Usage                         |
+|---------------|-------------------------------|
+| `oxmysql`     | Requêtes SQL asynchrones      |
+| `kt_lib`      | Librairie partagée Kitotake   |
+| `kt_inventory`| Gestion des items (cartes)    |
+| `union`       | Framework de personnages      |
+
+---
 
 ## 🚀 Installation
 
-### 1️⃣ Base de Données
+### 1. Base de données
 
-Exécutez le fichier SQL dans votre base de données:
-```bash
-banking_schema.sql
+```sql
+-- Exécuter une seule fois
+source bank.sql
 ```
 
-### 2️⃣ Items kt_inventory
+### 2. Items kt_inventory
 
-Ajoutez les items dans `kt_inventory/data/items.lua`:
+Dans `kt_inventory/data/items.lua`, ajoutez :
+
 ```lua
--- Copiez le contenu de kt_inventory_items.lua
+["bank_card"]         = { label = "Carte Bancaire Basique",  weight = 10 },
+["bank_gold_card"]    = { label = "Carte Bancaire Or",        weight = 10 },
+["bank_diamond_card"] = { label = "Carte Bancaire Diamant",   weight = 10 },
 ```
 
-### 3️⃣ Images des Cartes
+### 3. Images
 
-Placez les images suivantes dans `kt_inventory/web/images/`:
-- `bank_card.png` - Carte basique
-- `bank_gold_card.png` - Carte or
-- `bank_diamond_card.png` - Carte diamant
+Placez dans `kt_inventory/web/images/` :
+- `bank_card.png`
+- `bank_gold_card.png`
+- `bank_diamond_card.png`
 
-### 4️⃣ Ressource
+### 4. server.cfg
 
-1. Placez le dossier `kt_banque` dans votre dossier `resources/`
-2. Ajoutez dans votre `server.cfg`:
 ```cfg
 ensure kt_lib
 ensure kt_inventory
 ensure kt_banque
 ```
 
-## ⚙️ Configuration
+---
 
-Éditez `config.lua` pour personnaliser:
+## ⚙️ Configuration (`config.lua`)
 
-### Types de Cartes
+### Limites de cartes
+
 ```lua
 Config.CardLimits = {
-    carte_basique = { 
-        MaxDeposit = 2500,    -- Dépôt maximum
-        MaxWithdraw = 1000,   -- Retrait maximum
-        Price = 50            -- Prix de la carte
-    },
-    carte_or = { 
-        MaxDeposit = 4500, 
-        MaxWithdraw = 3000,
-        Price = 12500 
-    },
-    carte_dimas = { 
-        MaxDeposit = 5500, 
-        MaxWithdraw = 4500,
-        Price = 45000 
-    }
+    carte_basique = { MaxDeposit = 5000,  MaxWithdraw = 5000,  Price = 0     },
+    carte_or      = { MaxDeposit = 15000, MaxWithdraw = 10000, Price = 15000 },
+    carte_dimas   = { MaxDeposit = 50000, MaxWithdraw = 25000, Price = 50000 },
 }
 ```
 
-### PNJ Banquier
-```lua
-Config.PNJ = {
-    Enabled = true,
-    Model = "cs_bankman",
-    Coords = vec3(254.04, 222.72, 104.25),
-    Heading = 147.0
-}
-```
+Les limites sont **journalières** et se réinitialisent automatiquement à minuit.
 
 ### Options
+
 ```lua
-Config.RequireCard = true       -- Nécessite une carte pour utiliser le système
-Config.Debug = false            -- Mode debug (logs détaillés)
-Config.SpamDelay = 1000        -- Délai anti-spam en ms
+Config.RequireCard = true    -- Carte requise pour accéder au menu
+Config.Debug       = false   -- Active les logs et la commande /ktbank_open (admin)
+Config.SpamDelay   = 1500    -- Délai anti-spam entre deux opérations (ms)
 ```
+
+---
 
 ## 🎮 Utilisation
 
-### Pour les Joueurs
+### Joueurs
 
-1. **Créer un compte**: Rendez-vous au PNJ "Création de compte" dans une banque
-2. **Acheter une carte améliorée**: Parlez au PNJ "Achat de carte"
-3. **Utiliser un ATM**: Approchez-vous d'un distributeur automatique et appuyez sur `E`
+1. **Ouvrir un compte** : approchez-vous du PNJ "Ouvrir un compte" (touche `E`)  
+2. **Choisissez un PIN** à 4 chiffres lors de la création  
+3. **Utiliser un ATM** : approchez-vous d'un distributeur (touche `E`)  
+4. **Améliorer votre carte** : parlez au PNJ "Améliorer carte"
 
-### Commandes
+### Raccourcis
 
-- `/bankmenu` - Ouvrir le menu bancaire avancé (optionnel)
+| Touche | Action                  |
+|--------|-------------------------|
+| `E`    | Interagir ATM / PNJ     |
+| `ESC`  | Fermer l'interface      |
 
-### Raccourcis Clavier
+### Commandes admin (Debug uniquement)
 
-- `E` - Interagir avec ATM ou PNJ
-- `ESC` - Fermer l'interface
-
-## 🔧 Exports Serveur
-
-### Récupérer les informations d'un compte
-```lua
-local accountInfo = exports['kt_banque']:GetAccountInfo(accountId)
+```
+/ktbank_open   — Ouvre le menu (ACE permission requis)
 ```
 
-### Récupérer le solde
+---
+
+## 🔧 Exports serveur
+
 ```lua
-local balance = exports['kt_banque']:GetAccountBalance(accountId)
+-- Solde d'un compte
+local balance = exports['kt_banque']:GetAccountBalance(uniqueId)
+
+-- Informations complètes
+local info = exports['kt_banque']:GetAccountInfo(uniqueId)
+-- Retourne : { id, account_number, iban, balance, status, label }
+
+-- Ajouter de l'argent (admin)
+local ok = exports['kt_banque']:AddMoney(uniqueId, montant)
+
+-- Retirer de l'argent (admin)
+local ok = exports['kt_banque']:RemoveMoney(uniqueId, montant)
+
+-- Virement entre deux comptes (API)
+local ok, msg = exports['kt_banque']:Transfer(fromUniqueId, toUniqueId, montant)
 ```
 
-### Ajouter de l'argent
-```lua
-exports['kt_banque']:AddMoney(accountId, amount)
-```
+---
 
-### Retirer de l'argent
-```lua
-local success = exports['kt_banque']:RemoveMoney(accountId, amount)
-```
+## 🔒 Sécurité
 
-### Transférer entre comptes
-```lua
-local success, message = exports['kt_banque']:Transfer(fromAccountId, toAccountId, amount)
-```
+- Le PIN n'est **jamais** envoyé en clair sur le réseau — seul son hash transite
+- La vérification du PIN se fait **côté serveur** uniquement
+- Anti-spam configurable (`Config.SpamDelay`)
+- Validation de tous les montants côté serveur (positif, entier)
+- Limites journalières enforced côté serveur
 
-### Statistiques du compte
-```lua
-local stats = exports['kt_banque']:GetStats(accountId)
--- Retourne: total_deposits, total_withdraws, total_transfers_out, total_transfers_in, transaction_count, current_balance
-```
+---
 
-### Exports Admin
-```lua
--- Désactiver une carte
-exports['kt_banque']:AdminDeactivateCard(identifier)
+## 📊 Schéma base de données
 
--- Réimprimer le PIN
-exports['kt_banque']:AdminReprintPin(identifier)
+| Table                | Contenu                               |
+|---------------------|---------------------------------------|
+| `bank_accounts`     | Comptes bancaires                     |
+| `bank_cards`        | Cartes (PIN hashé, type, expiration)  |
+| `bank_transactions` | Historique complet des opérations     |
+| `bank_limits`       | Limites journalières par compte       |
+| `bank_logs`         | Logs admin                            |
 
--- Créer une carte pour un joueur
-exports['kt_banque']:AdminCreateCardForPlayer(identifier, cardType, pin)
-
--- Obtenir les infos d'un compte
-exports['kt_banque']:AdminGetAccountInfo(identifier)
-
--- Définir le solde
-exports['kt_banque']:AdminSetBalance(accountId, amount)
-```
-
-## 📊 Structure de la Base de Données
-
-### Table `banking`
-- Stocke les comptes bancaires
-- Champs: account_id, identifier, balance, owner_name, label
-
-### Table `bank_cards`
-- Stocke les cartes bancaires
-- Champs: id, identifier, account_id, card_number, pin, card_type, active
-
-### Table `bank_logs`
-- Historique des transactions
-- Champs: id, account_id, action, amount, identifier, description, date
-
-## 🎨 Interface
-
-- Design moderne et responsive
-- Animations fluides
-- Support mobile
-- Thème sombre élégant
-- Effets visuels immersifs
+---
 
 ## 🐛 Dépannage
 
-### Le NUI ne s'ouvre pas
-1. Vérifiez que `kt_lib` est bien démarré avant `kt_banque`
-2. Vérifiez la console F8 pour les erreurs JavaScript
-3. Activez le mode debug: `Config.Debug = true`
+| Symptôme | Solution |
+|----------|----------|
+| L'interface ne s'ouvre pas | Vérifiez que `kt_lib` démarre avant `kt_banque` |
+| "Aucune carte" alors que vous en avez une | Vérifiez les noms d'items dans `Config.BankCardItem` |
+| Solde incorrect après opération | Vérifiez les logs MySQL avec `Config.Debug = true` |
+| PIN refusé | Le hash doit être identique dans `server/main.lua` et `web/src/utils/index.ts` |
+| Le PNJ ne spawn pas | Vérifiez les coordonnées `Config.PNJ.Coords` en jeu |
 
-### Les cartes n'apparaissent pas dans l'inventaire
-1. Vérifiez que les items sont bien ajoutés dans kt_inventory
-2. Redémarrez kt_inventory après avoir ajouté les items
-3. Vérifiez les noms des items dans `Config.BankCardItem`
-
-### Les PNJ ne spawn pas
-1. Vérifiez les coordonnées dans `Config.PNJ` et `Config.PNJ2`
-2. Vérifiez que le modèle existe: `cs_bankman`
-3. Consultez la console serveur pour les messages d'erreur
-
-### Erreurs SQL
-1. Vérifiez que toutes les tables sont créées
-2. Vérifiez les permissions MySQL
-3. Utilisez oxmysql récent
+---
 
 ## 📝 Changelog
 
-faut debug les pages web pour voir les erreurs acheta des carte pas possible
+### v7.4.1 (correctif)
+- ✅ Deposit / Withdraw / Transfer implémentés côté serveur (manquants en v7.4)
+- ✅ PIN hashé — jamais transmis en clair
+- ✅ Événements NUI alignés entre client et serveur (`openBank`, `openCreate`)
+- ✅ PNJ2 ouvre le formulaire NUI (plus de PIN `1234` hardcodé)
+- ✅ `useRef` inutilisé supprimé du Dashboard
+- ✅ Dépendances `useCallback` corrigées dans PinPage
+- ✅ Limites journalières utilisées et vérifiées
+- ✅ Guard null sur `accountData` dans DashboardPage
+- ✅ Timeout 8s sur les requêtes NUI
+- ✅ `fxmanifest.lua` nettoyé (virgule superflue supprimée)
+- ✅ Fichier de config unifié (suppression de `shared/config.lua`)
+- ✅ Exports `GetAccountInfo` et `Transfer` ajoutés
 
-### Version 6.5.0
-- ✅ Intégration complète kt_lib
-- ✅ Support kt_inventory
-- ✅ Système de cartes améliorées
-- ✅ Interface NUI moderne
-- ✅ Système de logs détaillé
-- ✅ Exports pour développeurs
-- ✅ Animations ATM
+### v7.4.0
+- Intégration complète kt_lib / kt_inventory
+- Interface NUI React/TypeScript
+- Système de cartes et limites
+- Historique des transactions
 
-## 💡 Support
-
-Pour toute question ou problème:
-1. Vérifiez ce README
-2. Consultez les logs serveur/client
-3. Activez le mode debug
+---
 
 ## 📄 Licence
 
-Tous droits réservés - Kitotake Development
-
----
+Tous droits réservés — Kitotake Development

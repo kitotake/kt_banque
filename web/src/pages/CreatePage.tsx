@@ -1,4 +1,4 @@
-// ==================== KT BANQUE - Create Account Page ====================
+// ==================== KT BANQUE v7.4.1 - Create Account Page ====================
 import { useState, useCallback } from 'react';
 import { sendToServer } from '../utils';
 import { useNotification } from '../hooks/useNotification';
@@ -7,23 +7,19 @@ import styles from './CreatePage.module.scss';
 
 export function CreatePage() {
   const notify = useNotification();
-  const close = useClose();
-  const [pin1, setPin1] = useState('');
-  const [pin2, setPin2] = useState('');
-  const [error, setError] = useState('');
+  const close  = useClose();
+  const [pin1,    setPin1]    = useState('');
+  const [pin2,    setPin2]    = useState('');
+  const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
 
   const sanitize = (v: string) => v.replace(/\D/g, '').slice(0, 4);
 
-  const isValid =
-    pin1.length === 4 &&
-    pin2.length === 4 &&
-    pin1 === pin2;
+  const isValid = pin1.length === 4 && pin2.length === 4 && pin1 === pin2;
 
   const matchState = (v: string) => {
     if (v.length < 4) return '';
-    if (v === pin1) return styles['field__input--valid'];
-    return styles['field__input--invalid'];
+    return v === pin1 ? styles['field__input--valid'] : styles['field__input--invalid'];
   };
 
   const handleCreate = useCallback(async () => {
@@ -33,9 +29,13 @@ export function CreatePage() {
     }
     setLoading(true);
     try {
+      // On envoie le PIN brut uniquement ici : le serveur va le hasher lui-même
+      // (la création de compte est l'unique moment où le PIN brut transite)
       await sendToServer('createAccount', { pin: pin1 });
       notify('Compte créé avec succès !', 'success');
-      setPin1(''); setPin2(''); setError('');
+      setPin1('');
+      setPin2('');
+      setError('');
     } catch {
       notify('Erreur lors de la création', 'error');
     } finally {
@@ -60,7 +60,7 @@ export function CreatePage() {
             maxLength={4}
             placeholder="• • • •"
             value={pin1}
-            onChange={e => { setPin1(sanitize(e.target.value)); setError(''); }}
+            onChange={(e) => { setPin1(sanitize(e.target.value)); setError(''); }}
             autoComplete="off"
           />
         </div>
@@ -73,9 +73,9 @@ export function CreatePage() {
             maxLength={4}
             placeholder="• • • •"
             value={pin2}
-            onChange={e => { setPin2(sanitize(e.target.value)); setError(''); }}
+            onChange={(e) => { setPin2(sanitize(e.target.value)); setError(''); }}
             autoComplete="off"
-            onKeyDown={e => e.key === 'Enter' && !loading && isValid && handleCreate()}
+            onKeyDown={(e) => e.key === 'Enter' && !loading && isValid && handleCreate()}
           />
         </div>
 

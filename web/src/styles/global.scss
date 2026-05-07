@@ -1,18 +1,13 @@
 @use './_tokens.scss' as *;
 
-// ==================== GOOGLE FONTS ====================
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap');
 
-// ==================== RESET ====================
 *, *::before, *::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  margin: 0; padding: 0; box-sizing: border-box;
 }
 
 html, body {
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   overflow: hidden;
   background: transparent;
   color: $text-1;
@@ -24,68 +19,18 @@ html, body {
 }
 
 #root {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100vw; height: 100vh;
+  display: flex; align-items: center; justify-content: center;
 }
 
-// ==================== SCROLLBAR ====================
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: $border-dim;
-  border-radius: 99px;
-  &:hover { background: $surface-4; }
-}
+::-webkit-scrollbar-thumb { background: $border-dim; border-radius: 99px; &:hover { background: $surface-4; } }
 
-// ==================== KEYFRAMES ====================
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(24px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%       { transform: translateX(-8px); }
-  40%       { transform: translateX(8px); }
-  60%       { transform: translateX(-5px); }
-  80%       { transform: translateX(5px); }
-}
-
-@keyframes balancePop {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.06); color: $gold-light; }
-  100% { transform: scale(1); }
-}
-
-@keyframes notifIn {
-  from { opacity: 0; transform: translateY(-12px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes notifOut {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to   { opacity: 0; transform: translateY(-8px) scale(0.96); }
-}
-
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes scanline {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
-}
-
-@keyframes pulse-ring {
-  0%   { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes shake   { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+@keyframes balancePop { 0% { transform: scale(1); } 40% { transform: scale(1.06); color: $gold-light; } 100% { transform: scale(1); } }
+@keyframes notifIn  { from { opacity: 0; transform: translateY(-12px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+@keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.5); opacity: 0; } }

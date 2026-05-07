@@ -1,12 +1,12 @@
-// ==================== KT BANQUE - Notification ====================
+// ==================== KT BANQUE v7.4.1 - Notification ====================
 import { useAppStore } from '../../store';
 import styles from './Notification.module.scss';
 
 const ICONS: Record<string, string> = {
   success: '✓',
-  error: '✕',
+  error  : '✕',
   warning: '⚠',
-  info: 'ℹ',
+  info   : 'ℹ',
 };
 
 export function NotificationStack() {

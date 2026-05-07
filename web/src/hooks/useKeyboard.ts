@@ -1,4 +1,4 @@
-// ==================== KT BANQUE - useKeyboard hook ====================
+// ==================== KT BANQUE v7.4.1 - useKeyboard hook ====================
 import { useEffect } from 'react';
 
 export function useEscapeKey(callback: () => void, active: boolean) {

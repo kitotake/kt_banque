@@ -1,66 +1,70 @@
 Config = {}
 
 -- ==================== CONFIGURATION GÉNÉRALE ====================
-Config.Debug = false
+Config.Debug      = false
 Config.RequireCard = true
-Config.SpamDelay = 1000
+Config.SpamDelay  = 1000  -- ms entre deux actions (anti-spam)
 
 -- ==================== ITEMS & TYPES DE CARTES ====================
+-- Clés internes : card_basic / card_gold / card_diamond
+-- Valeurs       : nom de l'item dans kt_inventory
 Config.BankCardItem = {
-    carte_basique = "bank_card",
-    carte_or      = "bank_gold_card",
-    carte_dimas   = "bank_diamond_card"
+    card_basic   = "bank_card",
+    card_gold    = "bank_gold_card",
+    card_diamond = "bank_diamond_card"
 }
 
--- FIX: carte_or avait MaxWithdraw = 5 000 < carte_basique (20 000) — corrigé
 Config.CardLimits = {
-    carte_basique = {
-        MaxDeposit  = 5000,
-        MaxWithdraw = 20000,
-        Price       = 0,
+    card_basic = {
+        MaxDeposit  = 1500,
+        MaxWithdraw = 7500,
+        Price       = 250,
         DisplayName = "Carte Basique"
     },
-    carte_or = {
-        MaxDeposit  = 10000,
-        MaxWithdraw = 10000,   -- CORRIGÉ (était 5000, inférieur à la basique)
+    card_gold = {
+        MaxDeposit  = 5500,
+        MaxWithdraw = 17500,
         Price       = 15000,
         DisplayName = "Carte Or"
     },
-    carte_dimas = {
+    card_diamond = {
         MaxDeposit  = 50000,
         MaxWithdraw = 25000,
-        Price       = 50000,
+        Price       = 35000,
         DisplayName = "Carte Diamant"
     }
 }
 
 -- ==================== BASE DE DONNÉES ====================
--- FIX: noms de tables alignés avec bank.sql
 Config.DB = {
-    banking_table    = "banking",
-    bank_cards_table = "bank_cards",
-    bank_logs_table  = "bank_logs"
+    banking_table           = "bank_accounts",
+    bank_cards_table        = "bank_cards",
+    bank_limits_table       = "bank_limits",
+    bank_transactions_table = "bank_transactions",
+    bank_logs_table         = "bank_logs"
 }
 
 -- ==================== PNJ BANQUIERS ====================
 Config.PNJ = {
-    Enabled   = true,
-    Model     = "cs_bankman",
-    Coords    = vector3(242.90, 222.07, 106.28),
-    Heading   = 340.0,
-    Frozen    = true,
+    Enabled    = true,
+    Model      = "cs_bankman",
+    Coords     = vector3(242.90, 222.07, 106.28),
+    Heading    = 340.0,
+    Frozen     = true,
     Invincible = true,
-    Scenario  = "WORLD_HUMAN_CLIPBOARD"
+    Scenario   = "WORLD_HUMAN_CLIPBOARD",
+    Label      = "[E] Améliorer carte"
 }
 
 Config.PNJ2 = {
-    Enabled   = true,
-    Model     = "cs_bankman",
-    Coords    = vector3(251.90, 219.07, 106.28),
-    Heading   = 250.0,
-    Frozen    = true,
+    Enabled    = true,
+    Model      = "cs_bankman",
+    Coords     = vector3(251.90, 219.07, 106.28),
+    Heading    = 250.0,
+    Frozen     = true,
     Invincible = true,
-    Scenario  = "WORLD_HUMAN_STAND_IMPATIENT"
+    Scenario   = "WORLD_HUMAN_STAND_IMPATIENT",
+    Label      = "[E] Ouvrir un compte"
 }
 
 -- ==================== ATM ====================
@@ -72,7 +76,7 @@ Config.ATMModels = {
 }
 
 Config.InteractionDistance = 2.5
-Config.ATMDistance          = 1.5
+Config.ATMDistance         = 1.5
 
 -- ==================== BLIPS ====================
 Config.Blips = {
@@ -124,16 +128,20 @@ Config.Lang = {
     incorrect_pin        = "❌ Code PIN incorrect",
     insufficient_balance = "❌ Solde insuffisant",
     insufficient_cash    = "❌ Argent liquide insuffisant",
-    limit_exceeded       = "❌ Limite dépassée pour votre type de carte",
+    limit_exceeded       = "❌ Limite journalière dépassée pour votre carte",
     target_not_found     = "❌ Compte destinataire introuvable",
     same_account         = "❌ Vous ne pouvez pas vous transférer à vous-même",
     invalid_amount       = "❌ Montant invalide",
     spam                 = "⏳ Veuillez patienter",
+    card_inactive        = "❌ Votre carte bancaire est désactivée",
 
     -- Interactions
-    press_to_use_atm       = "Appuyez sur ~INPUT_CONTEXT~ pour utiliser l'ATM",
+    press_to_use_atm        = "Appuyez sur ~INPUT_CONTEXT~ pour utiliser l'ATM",
     press_to_create_account = "Appuyez sur ~INPUT_CONTEXT~ pour ouvrir un compte",
-    press_to_upgrade_card  = "Appuyez sur ~INPUT_CONTEXT~ pour améliorer votre carte"
+    press_to_upgrade_card   = "Appuyez sur ~INPUT_CONTEXT~ pour améliorer votre carte"
 }
 
-print('^2[KT Banque]^7 Configuration chargée (v7.3)')
+if Config.Debug then
+    print('^3[KT Banque]^7 Mode DEBUG activé')
+end
+print('^2[KT Banque]^7 Configuration chargée (v7.4.1)')

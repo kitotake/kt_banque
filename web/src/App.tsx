@@ -1,4 +1,4 @@
-// ==================== KT BANQUE - App ====================
+// ==================== KT BANQUE v7.4.1 - App ====================
 import { useAppStore } from './store';
 import { useNUIMessage, useClose } from './hooks/useNUI';
 import { useEscapeKey } from './hooks/useKeyboard';
@@ -6,8 +6,6 @@ import { NotificationStack } from './components/ui/Notification';
 import { PinPage } from './pages/PinPage';
 import { CreatePage } from './pages/CreatePage';
 import { DashboardPage } from './pages/DashboardPage';
-import styles from './App.module.scss';
-
 
 function AppInner() {
   const { state } = useAppStore();
@@ -29,6 +27,5 @@ function AppInner() {
 }
 
 export default function App() {
-  // AppProvider is in main.tsx wrapping this — see below
   return <AppInner />;
 }

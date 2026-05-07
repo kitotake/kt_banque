@@ -1,4 +1,4 @@
-// ==================== KT BANQUE - useNUI hook ====================
+// ==================== KT BANQUE v7.4.1 - useNUI hook ====================
 import { useEffect } from 'react';
 import { useAppStore } from '../store';
 import { AccountData, NUIMessage } from '../types';
@@ -12,17 +12,22 @@ export function useNUIMessage() {
       const { action, data, balance } = event.data;
 
       switch (action) {
+        // FIX: aligné avec l'event serveur 'bank:client:openBank'
         case 'openBank':
           dispatch({ type: 'OPEN_BANK', payload: data as AccountData });
           break;
+
+        // FIX: aligné avec 'bank:client:openCreate'
         case 'openCreate':
           dispatch({ type: 'OPEN_CREATE' });
           break;
+
         case 'updateBalance': {
-          const val = typeof data === 'number' ? data : (balance ?? (data as any));
+          const val = typeof data === 'number' ? data : (typeof balance === 'number' ? balance : undefined);
           if (typeof val === 'number') dispatch({ type: 'UPDATE_BALANCE', payload: val });
           break;
         }
+
         case 'close':
           dispatch({ type: 'CLOSE' });
           break;

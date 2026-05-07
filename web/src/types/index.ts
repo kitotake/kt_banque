@@ -1,6 +1,8 @@
-// ==================== KT BANQUE - TYPES ====================
+// ==================== KT BANQUE v7.4.1 - TYPES ====================
+// FIX: CardType aligné avec config.lua (card_basic / card_gold / card_diamond)
 
-export type CardType = 'carte_basique' | 'carte_or' | 'carte_dimas';
+export type CardType = 'card_basic' | 'card_gold' | 'card_diamond';
+
 export type TransactionType =
   | 'deposit'
   | 'withdraw'
@@ -38,16 +40,16 @@ export interface Transaction {
   account_id: string;
   action: TransactionType;
   amount: number;
-  identifier: string;
+  balance_after?: number;
   description: string;
   date: string;
-  balance_after?: number;
 }
 
 export interface AccountData {
   account_id: string;
   balance: number;
-  pin: string;
+  /** Hash du PIN — jamais le PIN brut */
+  pin_hash: string;
   requiresPin: boolean;
   card_meta: CardMeta;
   account_info: AccountInfo;
@@ -63,7 +65,7 @@ export interface NUIMessage {
 
 export interface NUIPayload {
   amount?: number;
-  cardId?: number;
-  pin?: string;
+  pinHash?: string;
   target?: string;
+  pin?: string;
 }

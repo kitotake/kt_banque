@@ -1,50 +1,47 @@
--- ==================== KT BANQUE v7.4 SUPPORT UNION - SCHÉMA SQL ====================
+-- ==================== KT BANQUE v7.4.1 - SCHÉMA SQL ====================
+-- Exécutez ce fichier une seule fois sur votre base de données.
+-- Les tables utilisent IF NOT EXISTS pour être sûres à relancer.
 
 -- ============================================
--- BANK ACCOUNTS (KT Banque v7.4 + Union)
+-- COMPTES BANCAIRES
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_accounts` (
     `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `account_number`   VARCHAR(10)  NOT NULL,
+    `account_number`   VARCHAR(12)  NOT NULL,
     `unique_id`        VARCHAR(36)  NOT NULL,
     `owner_identifier` VARCHAR(60)  NOT NULL,
     `iban`             VARCHAR(34)  NOT NULL UNIQUE,
-    `label`    VARCHAR(100) DEFAULT 'Compte Personnel',
-    `type`     ENUM('personal','business','shared') DEFAULT 'personal',
-    `balance`  BIGINT       NOT NULL DEFAULT 0,
-    `status`   ENUM('active','suspended','closed') DEFAULT 'active',
-
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `label`            VARCHAR(100) DEFAULT 'Compte Personnel',
+    `type`             ENUM('personal','business','shared') DEFAULT 'personal',
+    `balance`          BIGINT       NOT NULL DEFAULT 0,
+    `status`           ENUM('active','suspended','closed') DEFAULT 'active',
+    `created_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_account_number` (`account_number`),
-    INDEX `idx_unique_id` (`unique_id`),
+    UNIQUE KEY `uk_unique_id` (`unique_id`),
     INDEX `idx_owner` (`owner_identifier`),
-
-    CONSTRAINT `fk_bankaccount_char`
-        FOREIGN KEY (`unique_id`)
-        REFERENCES `characters` (`unique_id`)
-        ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INDEX `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- BANK TRANSACTIONS (KT Banque v7.4)
+-- TRANSACTIONS
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_transactions` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_id`        INT UNSIGNED NOT NULL,
     `transaction_uuid`  VARCHAR(36)  NOT NULL,
-    `type`              ENUM('deposit','withdraw','transfer_in','transfer_out','admin') NOT NULL,
-    `amount`            BIGINT       NOT NULL,
-    `balance_after`     BIGINT       NOT NULL,
+    `type`              ENUM('deposit','withdraw','transfer_in','transfer_out','admin','account_created','card_issued') NOT NULL,
+    `amount`            BIGINT       NOT NULL DEFAULT 0,
+    `balance_after`     BIGINT       NOT NULL DEFAULT 0,
     `description`       VARCHAR(255) DEFAULT NULL,
     `source_identifier` VARCHAR(60)  DEFAULT NULL,
     `target_account_id` INT UNSIGNED DEFAULT NULL,
     `created_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uniq_transaction_uuid` (`transaction_uuid`),
+    UNIQUE KEY `uk_transaction_uuid` (`transaction_uuid`),
     INDEX `idx_account` (`account_id`),
     INDEX `idx_account_date` (`account_id`, `created_at` DESC),
 
@@ -57,40 +54,41 @@ CREATE TABLE IF NOT EXISTS `bank_transactions` (
         FOREIGN KEY (`target_account_id`)
         REFERENCES `bank_accounts` (`id`)
         ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- BANK CARDS (KT Banque v7.4)
+-- CARTES BANCAIRES
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_cards` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_id`  INT UNSIGNED NOT NULL,
     `unique_id`   VARCHAR(36)  NOT NULL,
     `card_number` VARCHAR(19)  NOT NULL,
-    `pin`         CHAR(4)      NOT NULL,
-    `type`        ENUM('basic','gold','diamond') DEFAULT 'basic',
+    `pin_hash`    VARCHAR(64)  NOT NULL,  -- SHA-256 du PIN, jamais en clair
+    `type`        ENUM('card_basic','card_gold','card_diamond') DEFAULT 'card_basic',
     `active`      TINYINT(1)   DEFAULT 1,
     `expires_at`  DATE         NOT NULL,
     `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uniq_card_number` (`card_number`),
+    UNIQUE KEY `uk_card_number` (`card_number`),
     INDEX `idx_account` (`account_id`),
+    INDEX `idx_unique_id` (`unique_id`),
 
     CONSTRAINT `fk_card_account`
         FOREIGN KEY (`account_id`)
         REFERENCES `bank_accounts` (`id`)
         ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- BANK LIMITS (KT Banque v7.4)
+-- LIMITES JOURNALIÈRES
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_limits` (
-    `account_id`    INT UNSIGNED NOT NULL,
-    `deposit_today`  BIGINT DEFAULT 0,
-    `withdraw_today` BIGINT DEFAULT 0,
-    `last_reset`    DATE NOT NULL,
+    `account_id`     INT UNSIGNED NOT NULL,
+    `deposit_today`  BIGINT       DEFAULT 0,
+    `withdraw_today` BIGINT       DEFAULT 0,
+    `last_reset`     DATE         NOT NULL,
 
     PRIMARY KEY (`account_id`),
 
@@ -98,17 +96,19 @@ CREATE TABLE IF NOT EXISTS `bank_limits` (
         FOREIGN KEY (`account_id`)
         REFERENCES `bank_accounts` (`id`)
         ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- BANK LOGS (KT Banque v7.4)
+-- LOGS D'ADMINISTRATION
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_logs` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `unique_id`  VARCHAR(36)  NOT NULL,
     `action`     VARCHAR(255) NOT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `details`    TEXT         DEFAULT NULL,
+    `created_at` TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
-    INDEX `idx_unique_id` (`unique_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INDEX `idx_unique_id` (`unique_id`),
+    INDEX `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
