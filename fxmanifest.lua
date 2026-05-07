@@ -8,7 +8,8 @@ version '7.4.1'
 
 shared_scripts {
     '@kt_lib/init.lua',
-    'config.lua'
+    'shared/config/config.lua',
+    'shared/locales/*.lua'
 }
 
 client_scripts {
