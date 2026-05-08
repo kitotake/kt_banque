@@ -1,184 +1,227 @@
-# 🏦 KT Banque v7.4.1 — Système Bancaire FiveM
+# 🏦 KT Banque v7.5.0 — Guide d'installation
 
-Système bancaire complet pour FiveM avec interface NUI React, gestion des cartes, limites journalières et transferts sécurisés.
+Système bancaire FiveM entièrement refactorisé en modules, avec kt_inventory, commandes admin et traçabilité complète.
+
+---
+
+## 📁 Structure des fichiers
+
+```
+kt_banque/
+├── fxmanifest.lua
+├── bank.sql
+├── shared/
+│   ├── config/config.lua        ← configuration globale
+│   └── locales/fr.lua           ← messages
+├── server/
+│   ├── main.lua                 ← enregistrement des événements réseau
+│   ├── admin.lua                ← commandes admin + exports API
+│   └── modules/
+│       ├── utils.lua            ← générateurs, hash PIN, wrappers Union & kt_inventory
+│       ├── db.lua               ← toutes les requêtes SQL (DAL)
+│       ├── bank.lua             ← logique métier (dépôt, retrait, virement, carte)
+│       └── card_recovery.lua    ← récupération de carte bloquée
+└── client/
+    ├── main.lua                 ← nettoyage à l'arrêt
+    └── modules/
+        ├── animation.lua        ← animation ATM
+        ├── ui.lua               ← NUI + callbacks + événements serveur→client
+        ├── atm.lua              ← détection proximité distributeurs
+        ├── npc.lua              ← détection proximité PNJ
+        └── card_recovery.lua    ← UI récupération de carte
+```
 
 ---
 
 ## 📋 Prérequis
 
-| Ressource      | Usage                         |
-|---------------|-------------------------------|
-| `oxmysql`     | Requêtes SQL asynchrones      |
-| `kt_lib`      | Librairie partagée Kitotake   |
-| `kt_inventory`| Gestion des items (cartes)    |
-| `union`       | Framework de personnages      |
+| Ressource      | Rôle                              |
+|---------------|-----------------------------------|
+| `oxmysql`     | Requêtes SQL asynchrones          |
+| `kt_lib`      | Notifications, TextUI             |
+| `kt_inventory`| Gestion des items (cartes, cash)  |
+| `union`       | Framework de personnages          |
 
 ---
 
 ## 🚀 Installation
 
 ### 1. Base de données
-
 ```sql
--- Exécuter une seule fois
 source bank.sql
 ```
 
 ### 2. Items kt_inventory
 
-Dans `kt_inventory/data/items.lua`, ajoutez :
+Dans la config d'kt_inventory, ajoutez :
 
 ```lua
-["bank_card"]         = { label = "Carte Bancaire Basique",  weight = 10 },
-["bank_gold_card"]    = { label = "Carte Bancaire Or",        weight = 10 },
-["bank_diamond_card"] = { label = "Carte Bancaire Diamant",   weight = 10 },
+['bank_card']         = { label = 'Carte Bancaire Basique', weight = 10, stack = false },
+['bank_gold_card']    = { label = 'Carte Bancaire Or',      weight = 10, stack = false },
+['bank_diamond_card'] = { label = 'Carte Bancaire Diamant', weight = 10, stack = false },
+['bank_receipt']      = { label = 'Reçu bancaire',          weight = 1,  stack = true  },
+['money']             = { label = 'Argent liquide',         weight = 0,  stack = true  },
 ```
+
+> `money` est l'item cash standard d'kt_inventory. Si votre serveur utilise un nom différent, adaptez `KtInv.GetMoney / AddMoney / RemoveMoney` dans `server/modules/utils.lua`.
 
 ### 3. Images
 
-Placez dans `kt_inventory/web/images/` :
+Placez dans le dossier images d'kt_inventory :
 - `bank_card.png`
 - `bank_gold_card.png`
 - `bank_diamond_card.png`
+- `bank_receipt.png`
 
 ### 4. server.cfg
-
 ```cfg
+ensure oxmysql
 ensure kt_lib
 ensure kt_inventory
+ensure union
 ensure kt_banque
 ```
 
 ---
 
-## ⚙️ Configuration (`config.lua`)
+## ⚙️ Configuration
 
-### Limites de cartes
+Tout se passe dans `shared/config/config.lua`.
 
+### Limites journalières par carte
 ```lua
 Config.CardLimits = {
-    carte_basique = { MaxDeposit = 5000,  MaxWithdraw = 5000,  Price = 0     },
-    carte_or      = { MaxDeposit = 15000, MaxWithdraw = 10000, Price = 15000 },
-    carte_dimas   = { MaxDeposit = 50000, MaxWithdraw = 25000, Price = 50000 },
+    card_basic   = { MaxDeposit = 1500,  MaxWithdraw = 7500,  Price = 250   },
+    card_gold    = { MaxDeposit = 5500,  MaxWithdraw = 17500, Price = 15000 },
+    card_diamond = { MaxDeposit = 50000, MaxWithdraw = 25000, Price = 35000 },
 }
 ```
 
-Les limites sont **journalières** et se réinitialisent automatiquement à minuit.
-
-### Options
-
+### Reçus d'inventaire
 ```lua
-Config.RequireCard = true    -- Carte requise pour accéder au menu
-Config.Debug       = false   -- Active les logs et la commande /ktbank_open (admin)
-Config.SpamDelay   = 1500    -- Délai anti-spam entre deux opérations (ms)
+Config.Inventory = {
+    GiveReceipt  = true,          -- false pour désactiver
+    ReceiptItem  = "bank_receipt",
+    ReceiptCount = 1
+}
+```
+
+### Permission admin
+```lua
+Config.AdminAce = "group.admin"   -- ace FiveM standard
 ```
 
 ---
 
-## 🎮 Utilisation
+## 🎮 Commandes admin (console ou joueur avec ACE)
 
-### Joueurs
-
-1. **Ouvrir un compte** : approchez-vous du PNJ "Ouvrir un compte" (touche `E`)  
-2. **Choisissez un PIN** à 4 chiffres lors de la création  
-3. **Utiliser un ATM** : approchez-vous d'un distributeur (touche `E`)  
-4. **Améliorer votre carte** : parlez au PNJ "Améliorer carte"
-
-### Raccourcis
-
-| Touche | Action                  |
-|--------|-------------------------|
-| `E`    | Interagir ATM / PNJ     |
-| `ESC`  | Fermer l'interface      |
-
-### Commandes admin (Debug uniquement)
-
-```
-/ktbank_open   — Ouvre le menu (ACE permission requis)
-```
+| Commande | Description |
+|---|---|
+| `/bank_status <uid> <active\|suspended\|closed>` | Activer / suspendre / fermer un compte |
+| `/bank_addmoney <uid> <montant>` | Créditer un compte |
+| `/bank_removemoney <uid> <montant>` | Débiter un compte |
+| `/bank_info <uid>` | Afficher les infos d'un compte |
+| `/bank_total` | Somme globale de tous les comptes actifs |
+| `/bank_logs <uid> [limit]` | Historique des actions admin (console serveur) |
 
 ---
 
 ## 🔧 Exports serveur
 
 ```lua
--- Solde d'un compte
+-- Solde (nil si inexistant)
 local balance = exports['kt_banque']:GetAccountBalance(uniqueId)
 
--- Informations complètes
+-- Infos complètes (nil si inexistant, statut quelconque)
 local info = exports['kt_banque']:GetAccountInfo(uniqueId)
--- Retourne : { id, account_number, iban, balance, status, label }
 
--- Ajouter de l'argent (admin)
-local ok = exports['kt_banque']:AddMoney(uniqueId, montant)
+-- Somme globale de tous les comptes actifs
+local total = exports['kt_banque']:GetAllAccountsTotal()
 
--- Retirer de l'argent (admin)
-local ok = exports['kt_banque']:RemoveMoney(uniqueId, montant)
+-- Changer le statut (retourne true/false, message)
+local ok, msg = exports['kt_banque']:SetAccountStatus(uniqueId, "suspended")
 
--- Virement entre deux comptes (API)
-local ok, msg = exports['kt_banque']:Transfer(fromUniqueId, toUniqueId, montant)
+-- Créditer (retourne bool)
+local ok = exports['kt_banque']:AddMoney(uniqueId, 5000)
+
+-- Débiter (retourne bool)
+local ok = exports['kt_banque']:RemoveMoney(uniqueId, 1000)
+
+-- Virement API (retourne bool, message)
+local ok, msg = exports['kt_banque']:Transfer(fromUid, toUid, 2500)
 ```
 
 ---
 
-## 🔒 Sécurité
+## 🗄️ Intégration kt_inventory
 
-- Le PIN n'est **jamais** envoyé en clair sur le réseau — seul son hash transite
-- La vérification du PIN se fait **côté serveur** uniquement
+La connexion argent ↔ banque passe par l'item `money` d'kt_inventory :
+
+- **Dépôt** : `kt_inventory:RemoveItem(src, "money", amount)` → crédit en base
+- **Retrait** : crédit en base → `kt_inventory:AddItem(src, "money", amount)`
+- **Reçu** : chaque opération ajoute un item `bank_receipt` avec les métadonnées (label, date)
+
+Si vous préférez un système de cash séparé (ex. `GetPlayerMoney` d'un framework), remplacez les fonctions dans `OxInv.GetMoney / AddMoney / RemoveMoney` dans `server/modules/utils.lua` sans toucher au reste.
+
+---
+
+## 🔒 Sécurité & traçabilité
+
+- PIN hashé (SHA-like maison) — jamais transmis en clair
+- Vérification PIN **côté serveur uniquement**
 - Anti-spam configurable (`Config.SpamDelay`)
-- Validation de tous les montants côté serveur (positif, entier)
-- Limites journalières enforced côté serveur
+- Tous les montants validés côté serveur (entier positif)
+- Limites journalières enforced en base (réinitialisation automatique à minuit)
+- **Chaque action admin** est tracée dans `bank_logs` avec la source
+- Réactivation de carte en deux temps (débit + UPDATE conditionnel `WHERE active = 0`) pour éviter le double-clic
 
 ---
 
 ## 📊 Schéma base de données
 
-| Table                | Contenu                               |
-|---------------------|---------------------------------------|
-| `bank_accounts`     | Comptes bancaires                     |
-| `bank_cards`        | Cartes (PIN hashé, type, expiration)  |
-| `bank_transactions` | Historique complet des opérations     |
-| `bank_limits`       | Limites journalières par compte       |
-| `bank_logs`         | Logs admin                            |
+| Table | Contenu |
+|---|---|
+| `bank_accounts` | Comptes (solde, statut, IBAN…) |
+| `bank_cards` | Cartes (PIN hashé, type, expiration) |
+| `bank_transactions` | Historique complet |
+| `bank_limits` | Limites journalières par compte |
+| `bank_logs` | Journal admin |
 
 ---
 
 ## 🐛 Dépannage
 
 | Symptôme | Solution |
-|----------|----------|
-| L'interface ne s'ouvre pas | Vérifiez que `kt_lib` démarre avant `kt_banque` |
+|---|---|
+| Interface ne s'ouvre pas | Vérifiez que `kt_lib` démarre avant `kt_banque` |
 | "Aucune carte" alors que vous en avez une | Vérifiez les noms d'items dans `Config.BankCardItem` |
-| Solde incorrect après opération | Vérifiez les logs MySQL avec `Config.Debug = true` |
-| PIN refusé | Le hash doit être identique dans `server/main.lua` et `web/src/utils/index.ts` |
-| Le PNJ ne spawn pas | Vérifiez les coordonnées `Config.PNJ.Coords` en jeu |
+| Cash non débité/crédité | Vérifiez que l'item `money` existe dans kt_inventory |
+| PIN refusé | Hash doit être identique dans `utils.lua` et `web/src/utils/index.ts` |
+| PNJ invisible | Vérifiez les coordonnées `Config.PNJ.Coords` |
+| Commande admin refusée | Vérifiez que le joueur a l'ACE `group.admin` |
 
 ---
 
 ## 📝 Changelog
 
-### v7.4.1 (correctif)
-- ✅ Deposit / Withdraw / Transfer implémentés côté serveur (manquants en v7.4)
-- ✅ PIN hashé — jamais transmis en clair
-- ✅ Événements NUI alignés entre client et serveur (`openBank`, `openCreate`)
-- ✅ PNJ2 ouvre le formulaire NUI (plus de PIN `1234` hardcodé)
-- ✅ `useRef` inutilisé supprimé du Dashboard
-- ✅ Dépendances `useCallback` corrigées dans PinPage
-- ✅ Limites journalières utilisées et vérifiées
-- ✅ Guard null sur `accountData` dans DashboardPage
-- ✅ Timeout 8s sur les requêtes NUI
-- ✅ `fxmanifest.lua` nettoyé (virgule superflue supprimée)
-- ✅ Fichier de config unifié (suppression de `shared/config.lua`)
-- ✅ Exports `GetAccountInfo` et `Transfer` ajoutés
+### v7.5.0
+- ✅ Refactorisation complète en modules (utils / db / bank / admin)
+- ✅ Migration kt_inventory → kt_inventory (cash via item `money`)
+- ✅ Reçus de transaction dans l'inventaire du joueur
+- ✅ Couche DAL (`db.lua`) : toutes les requêtes SQL isolées
+- ✅ Commandes admin avec traçabilité complète
+- ✅ Export `GetAllAccountsTotal` et `SetAccountStatus`
+- ✅ `DB.GetAccountAny` pour les admins (ignore le statut)
+- ✅ `DB.ReactivateCard` avec UPDATE conditionnel anti double-exécution
+- ✅ Modules client séparés (animation / ui / atm / npc / card_recovery)
+- ✅ `fxmanifest.lua` mis à jour (kt_lib, kt_inventory, ordre de chargement)
 
-### v7.4.0
-- Intégration complète kt_lib / kt_inventory
-- Interface NUI React/TypeScript
-- Système de cartes et limites
-- Historique des transactions
+### v7.4.1
+- Deposit / Withdraw / Transfer implémentés côté serveur
+- PIN hashé, jamais transmis en clair
+- Limites journalières enforced
 
 ---
 
 ## 📄 Licence
-
 Tous droits réservés — Kitotake Development

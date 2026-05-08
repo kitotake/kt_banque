@@ -1,9 +1,10 @@
+-- ==================== KT BANQUE v7.5.0 — CONFIG ====================
 Config = {}
 
--- ==================== CONFIGURATION GÉNÉRALE ====================
+-- ==================== GÉNÉRAL ====================
 Config.Debug      = false
 Config.RequireCard = true
-Config.SpamDelay  = 1000  -- ms entre deux actions (anti-spam)
+Config.SpamDelay  = 1000   -- ms entre deux actions (anti-spam)
 
 -- ==================== ITEMS & TYPES DE CARTES ====================
 -- Clés internes : card_basic / card_gold / card_diamond
@@ -44,6 +45,14 @@ Config.DB = {
     bank_logs_table         = "bank_logs"
 }
 
+-- ==================== INVENTAIRE ====================
+-- Reçu de transaction donné au joueur après chaque opération
+Config.Inventory = {
+    GiveReceipt  = true,           -- activer/désactiver les reçus
+    ReceiptItem  = "bank_receipt", -- item dans kt_inventory
+    ReceiptCount = 1
+}
+
 -- ==================== PNJ BANQUIERS ====================
 Config.PNJ = {
     Enabled    = true,
@@ -80,27 +89,9 @@ Config.ATMDistance         = 1.5
 
 -- ==================== BLIPS ====================
 Config.Blips = {
-    {
-        label  = "Banque Centrale",
-        pos    = vector3(150.266, -1040.203, 29.374),
-        sprite = 108,
-        color  = 2,
-        scale  = 0.8
-    },
-    {
-        label  = "Banque Pacific Standard",
-        pos    = vector3(247.49, 223.15, 106.29),
-        sprite = 108,
-        color  = 2,
-        scale  = 0.8
-    },
-    {
-        label  = "Banque Legion Square",
-        pos    = vector3(314.18, -278.62, 54.17),
-        sprite = 108,
-        color  = 2,
-        scale  = 0.8
-    }
+    { label = "Banque Centrale",        pos = vector3(150.266, -1040.203, 29.374), sprite = 108, color = 2, scale = 0.8 },
+    { label = "Banque Pacific Standard", pos = vector3(247.49,  223.15,  106.29),  sprite = 108, color = 2, scale = 0.8 },
+    { label = "Banque Legion Square",   pos = vector3(314.18,  -278.62,   54.17),  sprite = 108, color = 2, scale = 0.8 }
 }
 
 -- ==================== ANIMATIONS ====================
@@ -111,9 +102,9 @@ Config.Animations = {
     flag    = 1
 }
 
+-- ==================== ADMIN ====================
+-- Ace permission requise pour les commandes admin
+Config.AdminAce = "group.admin"
 
-
-if Config.Debug then
-    print('^3[KT Banque]^7 Mode DEBUG activé')
-end
-print('^2[KT Banque]^7 Configuration chargée (v7.4.1)')
+if Config.Debug then print('^3[KT Banque]^7 Mode DEBUG activé') end
+print('^2[KT Banque]^7 Configuration chargée (v7.5.0)')

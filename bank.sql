@@ -1,6 +1,6 @@
--- ==================== KT BANQUE v7.4.1 - SCHÉMA SQL ====================
+-- ==================== KT BANQUE v7.5.0 — SCHÉMA SQL ====================
 -- Exécutez ce fichier une seule fois sur votre base de données.
--- Les tables utilisent IF NOT EXISTS pour être sûres à relancer.
+-- Les tables utilisent IF NOT EXISTS — sans danger à relancer.
 
 -- ============================================
 -- COMPTES BANCAIRES
@@ -46,14 +46,9 @@ CREATE TABLE IF NOT EXISTS `bank_transactions` (
     INDEX `idx_account_date` (`account_id`, `created_at` DESC),
 
     CONSTRAINT `fk_transaction_account`
-        FOREIGN KEY (`account_id`)
-        REFERENCES `bank_accounts` (`id`)
-        ON DELETE CASCADE,
-
+        FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_transaction_target`
-        FOREIGN KEY (`target_account_id`)
-        REFERENCES `bank_accounts` (`id`)
-        ON DELETE SET NULL
+        FOREIGN KEY (`target_account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -64,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `bank_cards` (
     `account_id`  INT UNSIGNED NOT NULL,
     `unique_id`   VARCHAR(36)  NOT NULL,
     `card_number` VARCHAR(19)  NOT NULL,
-    `pin_hash`    VARCHAR(64)  NOT NULL,  -- SHA-256 du PIN, jamais en clair
+    `pin_hash`    VARCHAR(64)  NOT NULL,
     `type`        ENUM('card_basic','card_gold','card_diamond') DEFAULT 'card_basic',
     `active`      TINYINT(1)   DEFAULT 1,
     `expires_at`  DATE         NOT NULL,
@@ -76,9 +71,7 @@ CREATE TABLE IF NOT EXISTS `bank_cards` (
     INDEX `idx_unique_id` (`unique_id`),
 
     CONSTRAINT `fk_card_account`
-        FOREIGN KEY (`account_id`)
-        REFERENCES `bank_accounts` (`id`)
-        ON DELETE CASCADE
+        FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -93,9 +86,7 @@ CREATE TABLE IF NOT EXISTS `bank_limits` (
     PRIMARY KEY (`account_id`),
 
     CONSTRAINT `fk_limit_account`
-        FOREIGN KEY (`account_id`)
-        REFERENCES `bank_accounts` (`id`)
-        ON DELETE CASCADE
+        FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

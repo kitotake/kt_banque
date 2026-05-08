@@ -1,4 +1,4 @@
--- ==================== MESSAGES ====================
+-- ==================== KT BANQUE v7.5.0 — LOCALES FR ====================
 Config.Lang = {
     -- Succès
     account_created  = "✅ Compte bancaire créé avec succès !",
@@ -21,9 +21,16 @@ Config.Lang = {
     invalid_amount       = "❌ Montant invalide",
     spam                 = "⏳ Veuillez patienter",
     card_inactive        = "❌ Votre carte bancaire est désactivée",
+    account_suspended    = "❌ Ce compte est suspendu",
+    no_permission        = "❌ Permission insuffisante",
 
     -- Interactions
     press_to_use_atm        = "Appuyez sur ~INPUT_CONTEXT~ pour utiliser l'ATM",
     press_to_create_account = "Appuyez sur ~INPUT_CONTEXT~ pour ouvrir un compte",
-    press_to_upgrade_card   = "Appuyez sur ~INPUT_CONTEXT~ pour améliorer votre carte"
+    press_to_upgrade_card   = "Appuyez sur ~INPUT_CONTEXT~ pour améliorer votre carte",
+
+    -- Inventaire
+    receipt_deposit  = "Reçu dépôt",
+    receipt_withdraw = "Reçu retrait",
+    receipt_transfer = "Reçu virement"
 }
