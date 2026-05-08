@@ -18,6 +18,16 @@ CreateThread(function()
                 TriggerServerEvent('bank:server:upgradeCard', 'card_gold')
             end
 
+        -- PNJ remplacement de carte (bloquée / volée)
+        elseif Config.PNJ_Replace and Config.PNJ_Replace.Enabled
+            and #(coords - Config.PNJ_Replace.Coords) < Config.InteractionDistance then
+            sleep = 0
+            shown = true
+            lib.showTextUI(Config.PNJ_Replace.Label or '[E] Remplacer carte')
+            if IsControlJustReleased(0, 38) then
+                TriggerServerEvent('bank:server:replaceCard')
+            end
+
         -- PNJ ouverture de compte
         elseif Config.PNJ2 and Config.PNJ2.Enabled
             and #(coords - Config.PNJ2.Coords) < Config.InteractionDistance then

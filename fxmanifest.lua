@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 author 'Kitotake Development'
-description 'Système bancaire NUI complet — refactorisé en modules.'
+description 'Système bancaire NUI complet — cartes avec métadonnées, blocage compte.'
 version '7.5.0'
 
 shared_scripts {
@@ -25,6 +25,7 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/modules/utils.lua',
     'server/modules/db.lua',
+    'server/modules/card_manager.lua',  -- ← NOUVEAU : avant bank
     'server/modules/bank.lua',
     'server/modules/card_recovery.lua',
     'server/admin.lua',
@@ -50,5 +51,7 @@ server_exports {
     'AddMoney',
     'RemoveMoney',
     'Transfer',
-    'SetAccountStatus'
+    'SetAccountStatus',
+    'BlockCard',
+    'ValidateAccountAccess'
 }

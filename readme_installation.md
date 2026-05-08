@@ -161,7 +161,7 @@ La connexion argent ↔ banque passe par l'item `money` d'kt_inventory :
 - **Retrait** : crédit en base → `kt_inventory:AddItem(src, "money", amount)`
 - **Reçu** : chaque opération ajoute un item `bank_receipt` avec les métadonnées (label, date)
 
-Si vous préférez un système de cash séparé (ex. `GetPlayerMoney` d'un framework), remplacez les fonctions dans `OxInv.GetMoney / AddMoney / RemoveMoney` dans `server/modules/utils.lua` sans toucher au reste.
+Si vous préférez un système de cash séparé (ex. `GetPlayerMoney` d'un framework), remplacez les fonctions dans `Ktinv.GetMoney / AddMoney / RemoveMoney` dans `server/modules/utils.lua` sans toucher au reste.
 
 ---
 

@@ -55,7 +55,12 @@ RegisterNUICallback('deposit', function(data, cb)
     local amount  = tonumber(data.amount)
     local pinHash = tostring(data.pinHash or "")
     if not amount or amount <= 0 then cb('err'); return end
+
+    print('Amount:', amount, 'PinHash:', pinHash) 
     TriggerServerEvent('bank:server:deposit', amount, pinHash)
+    print('Deposit event triggered')
+    print('Data sent to server:', amount, pinHash)
+    print('CurrentAccount:', currentAccount and json.encode(currentAccount) or 'nil')
     cb('ok')
 end)
 

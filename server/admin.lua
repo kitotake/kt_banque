@@ -106,8 +106,17 @@ RegisterCommand("bank_info", function(src, args)
     local acc = DB.GetAccountAny(uid)
     if not acc then AdminNotify(src, "❌ Compte introuvable."); return end
 
-    local info = ('📋 %s | IBAN: %s | Solde: $%d | Statut: %s'):format(
-        acc.account_number, acc.iban, acc.balance, acc.status)
+    local card = DB.GetLatestCard(uid)
+    local cardInfo = card
+        and ("Carte: %s | Active: %s | Type: %s"):format(
+            card.card_number or "?",
+            card.active == 1 and "✅" or "❌",
+            card.type or "?"
+        )
+        or "Aucune carte"
+
+    local info = ('📋 %s | IBAN: %s | Solde: $%d | Statut: %s\n%s'):format(
+        acc.account_number, acc.iban, acc.balance, acc.status, cardInfo)
     AdminNotify(src, info)
 end, false)
 
@@ -138,12 +147,83 @@ RegisterCommand("bank_logs", function(src, args)
         return
     end
 
-    -- Affichage dans la console serveur pour l'admin
     print(('[KT Banque] Logs pour %s :'):format(uid))
     for _, log in ipairs(logs) do
         print(('  [%s] %s — %s'):format(log.created_at, log.action, log.details or ""))
     end
     AdminNotify(src, ('📜 %d log(s) affiché(s) dans la console serveur.'):format(#logs))
+end, false)
+
+-- /bank_blockcard <uniqueId> [raison]
+RegisterCommand("bank_blockcard", function(src, args)
+    if not IsAdmin(src) then
+        TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
+        return
+    end
+
+    local uid    = args[1]
+    local reason = table.concat(args, " ", 2) or "Blocage administratif"
+
+    if not uid then
+        AdminNotify(src, "Usage : /bank_blockcard <uniqueId> [raison]")
+        return
+    end
+
+    -- Chercher si le joueur est connecté
+    local targetSrc = nil
+    for _, playerId in ipairs(GetPlayers()) do
+        local pUid = Union.GetCharacterUniqueId(tonumber(playerId))
+        if pUid == uid then
+            targetSrc = tonumber(playerId)
+            break
+        end
+    end
+
+    local ok, msg = CardManager.AdminBlockCard(src, targetSrc, uid, reason)
+    if ok then
+        AdminNotify(src, ('✅ Carte du compte %s bloquée — raison: %s'):format(uid, reason))
+    else
+        AdminNotify(src, '❌ ' .. (msg or "Erreur inconnue"))
+    end
+end, false)
+
+-- /bank_unblockcard <uniqueId>
+RegisterCommand("bank_unblockcard", function(src, args)
+    if not IsAdmin(src) then
+        TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
+        return
+    end
+
+    local uid = args[1]
+    if not uid then
+        AdminNotify(src, "Usage : /bank_unblockcard <uniqueId>")
+        return
+    end
+
+    local card = DB.GetLatestCard(uid)
+    if not card then AdminNotify(src, "❌ Aucune carte trouvée."); return end
+
+    local ok = CardManager.UnblockCard(uid, card.id)
+    if ok then
+        -- Si joueur connecté, mettre à jour ses métadonnées
+        for _, playerId in ipairs(GetPlayers()) do
+            local pUid = Union.GetCharacterUniqueId(tonumber(playerId))
+            if pUid == uid then
+                CardManager.UpdateCardMetadata(tonumber(playerId), uid, {
+                    blocked     = false,
+                    blockReason = nil,
+                    blockedAt   = nil
+                })
+                TriggerClientEvent('bank:client:notify', tonumber(playerId), 'success',
+                    "Votre carte bancaire a été débloquée par l'administration")
+                break
+            end
+        end
+        DB.Log(uid, 'admin_card_unblocked', ('Carte #%d débloquée par admin src=%d'):format(card.id, src))
+        AdminNotify(src, ('✅ Carte du compte %s débloquée'):format(uid))
+    else
+        AdminNotify(src, '❌ Carte introuvable ou déjà active.')
+    end
 end, false)
 
 -- ──────────────────────────────────────────
@@ -222,6 +302,20 @@ exports('Transfer', function(fromUniqueId, toUniqueId, amount)
     DB.AddTransaction(fromAcc.id, 'admin', 'transfer_out', amount, fromAcc.balance - amount, toAcc.id,   'Transfer API')
     DB.AddTransaction(toAcc.id,   'admin', 'transfer_in',  amount, toAcc.balance   + amount, fromAcc.id, 'Transfer API')
     DB.Log(fromUniqueId, 'api_transfer', ('%s -> %s : %d'):format(fromUniqueId, toUniqueId, amount))
+    return true, "OK"
+end)
+
+-- Export : bloquer une carte via API
+exports('BlockCard', function(uniqueId, reason)
+    local ok, msg = CardManager.AdminBlockCard("api", nil, uniqueId, reason or "API block")
+    return ok, msg
+end)
+
+-- Export : vérifier si un compte est accessible
+exports('ValidateAccountAccess', function(uniqueId)
+    local acc = DB.GetAccount(uniqueId)
+    if not acc then return false, "Compte inexistant ou inactif" end
+    if acc.status ~= 'active' then return false, "Compte non actif : " .. acc.status end
     return true, "OK"
 end)
 

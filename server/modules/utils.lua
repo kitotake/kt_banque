@@ -40,9 +40,16 @@ function Utils.GenerateIBAN(accountNumber)
     return "FRKT" .. num
 end
 
+-- Format SQL pour la base de données (YYYY-MM-DD)
 function Utils.GenerateExpiryDate()
     local y = tonumber(os.date("%Y")) + 3
     return string.format("%d-%s-%s", y, os.date("%m"), os.date("%d"))
+end
+
+-- Format lisible pour les métadonnées inventaire (MM/YYYY)
+function Utils.GenerateExpiryDateFormatted()
+    local y = tonumber(os.date("%Y")) + 3
+    return string.format("%s/%d", os.date("%m"), y)
 end
 
 function Utils.GenerateUUID()
@@ -111,52 +118,53 @@ end
 -- ──────────────────────────────────────────
 -- kt_inventory — wrappers
 -- ──────────────────────────────────────────
-OxInv = {}
+KtInv = {}
 
-function OxInv.GetMoney(src)
-    -- kt_inventory stocke le cash dans l'item "money"
+function KtInv.GetMoney(src)
     return exports.kt_inventory:GetItemCount(src, "money") or 0
 end
 
-function OxInv.AddMoney(src, amount)
+function KtInv.AddMoney(src, amount)
     exports.kt_inventory:AddItem(src, "money", amount)
 end
 
-function OxInv.RemoveMoney(src, amount)
+function KtInv.RemoveMoney(src, amount)
     return exports.kt_inventory:RemoveItem(src, "money", amount)
 end
 
-function OxInv.HasCard(src)
+function KtInv.HasCard(src)
     for _, item in pairs(Config.BankCardItem) do
         if exports.kt_inventory:GetItemCount(src, item) > 0 then return true end
     end
     return false
 end
 
--- Retourne la clé interne de la carte (card_basic / card_gold / card_diamond)
-function OxInv.GetCardType(src)
+function KtInv.GetCardType(src)
     for key, item in pairs(Config.BankCardItem) do
         if exports.kt_inventory:GetItemCount(src, item) > 0 then return key end
     end
     return nil
 end
 
-function OxInv.AddCard(src, cardType)
+function KtInv.AddCard(src, cardType, metadata)
     local item = Config.BankCardItem[cardType]
-    if item then exports.kt_inventory:AddItem(src, item, 1) end
-end
-
-function OxInv.RemoveCard(src)
-    for _, item in pairs(Config.BankCardItem) do
-        if exports.kt_inventory:GetItemCount(src, item) > 0 then
-            exports.kt_inventory:RemoveItem(src, item, 1)
-            return
-        end
+    if item then
+        exports.kt_inventory:AddItem(src, item, 1, metadata or {})
     end
 end
 
+function KtInv.RemoveCard(src)
+    for _, item in pairs(Config.BankCardItem) do
+        if exports.kt_inventory:GetItemCount(src, item) > 0 then
+            exports.kt_inventory:RemoveItem(src, item, 1)
+            return true
+        end
+    end
+    return false
+end
+
 -- Donne un reçu de transaction si activé dans la config
-function OxInv.GiveReceipt(src, label)
+function KtInv.GiveReceipt(src, label)
     if not Config.Inventory.GiveReceipt then return end
     exports.kt_inventory:AddItem(
         src,

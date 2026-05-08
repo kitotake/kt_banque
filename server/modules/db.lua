@@ -98,19 +98,29 @@ function DB.GetLatestCard(uniqueId)
     )
 end
 
+function DB.GetAllCards(uniqueId)
+    return MySQL.query.await(
+        'SELECT * FROM bank_cards WHERE unique_id = ? ORDER BY id DESC',
+        { uniqueId }
+    )
+end
+
 function DB.CreateCard(accountId, uniqueId, pinHash, cardType)
+    local cardNumber = Utils.GenerateCardNumber()
+    local expiryDate = Utils.GenerateExpiryDate()
     MySQL.insert.await(
         [[INSERT INTO bank_cards (account_id, unique_id, card_number, pin_hash, type, expires_at)
           VALUES (?, ?, ?, ?, ?, ?)]],
         {
             accountId,
             uniqueId,
-            Utils.GenerateCardNumber(),
+            cardNumber,
             pinHash,
             cardType or 'card_basic',
-            Utils.GenerateExpiryDate()
+            expiryDate
         }
     )
+    return cardNumber, expiryDate
 end
 
 function DB.DeactivateCards(uniqueId)
@@ -129,6 +139,31 @@ function DB.ReactivateCard(cardId)
         { cardId }
     )
     return result and result > 0
+end
+
+-- Bloquer une carte spécifique
+function DB.BlockCard(cardId)
+    local result = MySQL.update.await(
+        'UPDATE bank_cards SET active = 0 WHERE id = ? AND active = 1',
+        { cardId }
+    )
+    return result and result > 0
+end
+
+-- Mettre à jour le type d'une carte
+function DB.UpdateCardType(cardId, cardType)
+    MySQL.update.await(
+        'UPDATE bank_cards SET type = ? WHERE id = ?',
+        { cardType, cardId }
+    )
+end
+
+-- Marquer la date de dernière utilisation
+function DB.TouchCard(cardId)
+    MySQL.update.await(
+        'UPDATE bank_cards SET updated_at = NOW() WHERE id = ?',
+        { cardId }
+    )
 end
 
 -- ──────────────────────────────────────────

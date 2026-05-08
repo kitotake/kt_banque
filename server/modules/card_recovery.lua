@@ -1,10 +1,11 @@
 -- ==================== KT BANQUE v7.5.0 — SERVER/MODULES/CARD_RECOVERY ====================
 -- Gestion de la récupération de carte bloquée.
+-- Utilise CardManager pour la logique de remplacement.
 
-local RECOVERY_COST = 1000
+local RECOVERY_COST = Config and Config.CardReplaceCost or 1000
 
 -- ──────────────────────────────────────────
--- RÉCUPÉRER LA CARTE
+-- RÉCUPÉRER / REMPLACER LA CARTE
 -- ──────────────────────────────────────────
 
 RegisterNetEvent("kt_banque:card:recover", function()
@@ -29,34 +30,20 @@ RegisterNetEvent("kt_banque:card:recover", function()
         return
     end
 
-    local acc = DB.GetAccount(uid)
-    if not acc or acc.balance < RECOVERY_COST then
-        local bal = acc and acc.balance or 0
-        TriggerClientEvent("kt_banque:card:recoverResult", src, false,
-            ("Solde insuffisant ($%d / $%d)"):format(bal, RECOVERY_COST))
-        return
-    end
+    -- Déléguer à CardManager.ReplaceBlockedCard
+    local ok, result = CardManager.ReplaceBlockedCard(src, uid)
 
-    -- Débiter le compte
-    local newBalance = acc.balance - RECOVERY_COST
-    DB.UpdateBalance(acc.id, newBalance)
-    DB.AddTransaction(acc.id, 'system', 'withdraw', RECOVERY_COST, newBalance, nil, 'Récupération carte bancaire')
-
-    -- Réactiver la carte (anti double-exécution)
-    local ok = DB.ReactivateCard(card.id)
     if not ok then
-        -- Rollback
-        DB.UpdateBalance(acc.id, acc.balance)
-        TriggerClientEvent("kt_banque:card:recoverResult", src, false, "Erreur réactivation.")
+        TriggerClientEvent("kt_banque:card:recoverResult", src, false, result)
         return
     end
 
-    DB.Log(uid, "card_recovery", ("Carte #%d réactivée — $%d débité"):format(card.id, RECOVERY_COST))
     TriggerClientEvent("kt_banque:card:recoverResult", src, true)
-    TriggerClientEvent('bank:client:updateBalance', src, newBalance)
+    TriggerClientEvent('bank:client:updateBalance', src, result)
 
     if Config.Debug then
-        print(('[KT Banque] %s a récupéré sa carte ($%d)'):format(player.name or uid, RECOVERY_COST))
+        print(('[KT Banque] %s a récupéré sa carte ($%d)'):format(
+            player.name or uid, Config.CardReplaceCost or 1000))
     end
 end)
 
@@ -80,7 +67,51 @@ RegisterNetEvent("kt_banque:card:checkStatus", function()
         ORDER BY bc.id DESC LIMIT 1
     ]], { uid })
 
+    -- Enrichir avec les métadonnées inventaire
+    if data then
+        local physMeta, _ = CardManager.GetPhysicalCardMeta(src)
+        if physMeta then
+            data.meta_blocked  = physMeta.blocked  or false
+            data.meta_disabled = physMeta.disabled or false
+            data.meta_expire   = physMeta.expireDate or nil
+            data.meta_owner    = physMeta.owner or nil
+        end
+    end
+
     TriggerClientEvent("kt_banque:card:statusReceived", src, data)
+end)
+
+-- ──────────────────────────────────────────
+-- BLOCAGE VOLONTAIRE DE CARTE (joueur)
+-- ──────────────────────────────────────────
+
+RegisterNetEvent("kt_banque:card:selfBlock", function()
+    local src    = source
+    local player = Union.GetPlayer(src)
+    if not player or not player.currentCharacter then return end
+
+    local uid  = player.currentCharacter.unique_id
+    local card = DB.GetCard(uid)
+
+    if not card then
+        TriggerClientEvent('bank:client:notify', src, 'error', "Aucune carte active à bloquer")
+        return
+    end
+
+    -- Bloquer en base
+    DB.BlockCard(card.id)
+
+    -- Mettre à jour les métadonnées inventaire
+    CardManager.UpdateCardMetadata(src, uid, {
+        blocked     = true,
+        blockReason = "Blocage volontaire",
+        blockedAt   = os.time()
+    })
+
+    DB.Log(uid, "card_self_blocked", ("Carte #%d bloquée volontairement"):format(card.id))
+
+    TriggerClientEvent('bank:client:notify', src, 'success', "Carte bloquée. Demandez un remplacement au guichet")
+    TriggerClientEvent("kt_banque:card:checkStatus") -- rafraîchir
 end)
 
 print('^2[KT Banque]^7 Card recovery (server) chargé')

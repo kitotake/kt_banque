@@ -1,9 +1,9 @@
--- ==================== KT BANQUE v7.5.0 — SCHÉMA SQL ====================
--- Exécutez ce fichier une seule fois sur votre base de données.
--- Les tables utilisent IF NOT EXISTS — sans danger à relancer.
+-- ==================== KT BANQUE v7.5.0 — MIGRATION SQL ====================
+-- Exécutez ce fichier sur votre base de données existante.
+-- Compatible avec le schéma v7.4.x — toutes les modifications sont sûres.
 
 -- ============================================
--- COMPTES BANCAIRES
+-- COMPTES BANCAIRES (inchangé)
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_accounts` (
     `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `bank_accounts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- TRANSACTIONS
+-- TRANSACTIONS (inchangé)
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_transactions` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `bank_transactions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- CARTES BANCAIRES
+-- CARTES BANCAIRES — v7.5.0 : updated_at ajouté
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_cards` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS `bank_cards` (
     `active`      TINYINT(1)   DEFAULT 1,
     `expires_at`  DATE         NOT NULL,
     `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_card_number` (`card_number`),
@@ -74,8 +75,14 @@ CREATE TABLE IF NOT EXISTS `bank_cards` (
         FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Migration : ajouter updated_at si absent (base existante)
+ALTER TABLE `bank_cards`
+    ADD COLUMN IF NOT EXISTS `updated_at` TIMESTAMP
+        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        AFTER `created_at`;
+
 -- ============================================
--- LIMITES JOURNALIÈRES
+-- LIMITES JOURNALIÈRES (inchangé)
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_limits` (
     `account_id`     INT UNSIGNED NOT NULL,
@@ -90,7 +97,7 @@ CREATE TABLE IF NOT EXISTS `bank_limits` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- LOGS D'ADMINISTRATION
+-- LOGS D'ADMINISTRATION (inchangé)
 -- ============================================
 CREATE TABLE IF NOT EXISTS `bank_logs` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
