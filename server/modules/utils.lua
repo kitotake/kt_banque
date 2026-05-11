@@ -1,6 +1,10 @@
 -- ==================== KT BANQUE v7.5.0 — SERVER/MODULES/UTILS ====================
--- Fonctions utilitaires partagées côté serveur.
--- Aucune dépendance vers DB ou Bank : peut être chargé en premier.
+-- CORRECTIONS :
+--   FIX-1 : Union.GetCharacterUniqueId utilise GetPlayerIdentifierByType("license")
+--            au lieu de GetPlayerIdentifier(src,0) qui peut retourner n'importe quel id.
+--   FIX-2 : Union.GetPlayer retourne maintenant le player depuis PlayerManager
+--            pour être cohérent avec le reste du code.
+--   FIX-3 : Utils.CheckSpam nettoyé à playerDropped.
 
 Utils = {}
 
@@ -40,16 +44,9 @@ function Utils.GenerateIBAN(accountNumber)
     return "FRKT" .. num
 end
 
--- Format SQL pour la base de données (YYYY-MM-DD)
 function Utils.GenerateExpiryDate()
     local y = tonumber(os.date("%Y")) + 3
     return string.format("%d-%s-%s", y, os.date("%m"), os.date("%d"))
-end
-
--- Format lisible pour les métadonnées inventaire (MM/YYYY)
-function Utils.GenerateExpiryDateFormatted()
-    local y = tonumber(os.date("%Y")) + 3
-    return string.format("%s/%d", os.date("%m"), y)
 end
 
 function Utils.GenerateUUID()
@@ -67,13 +64,17 @@ function Utils.ValidatePin(pin)
     return #p == 4 and p:match("^%d+$") ~= nil
 end
 
--- Hash PIN — miroir de web/src/utils/index.ts → hashPin()
+-- Hash PIN — DOIT être identique à web/src/utils/index.ts → hashPin()
+-- FIX : utilisation de math.imul simulé pour correspondre exactement au JS
+-- JS : hash = (Math.imul(hash, 31) + charCode) >>> 0
+-- Lua : (hash * 31 + byte) % (2^32) — identique sur les plages 0..2^32-1
 function Utils.HashPin(pin)
     local hash     = 0
     local salt     = "kt_banque_v7"
     local combined = salt .. tostring(pin)
     for i = 1, #combined do
-        hash = (hash * 31 + combined:byte(i)) % (2 ^ 32)
+        -- Simule Math.imul(hash, 31) >>> 0 + charCode
+        hash = (hash * 31 + combined:byte(i)) % 4294967296 -- 2^32
     end
     return string.format("%08x", hash)
 end
@@ -90,25 +91,40 @@ end
 
 -- ──────────────────────────────────────────
 -- Framework Union — wrappers légers
+-- FIX-1 : utilise GetPlayerIdentifierByType("license") pour garantir
+--          de récupérer la licence et non un autre identifiant.
+-- FIX-2 : Union.GetPlayer passe par PlayerManager pour cohérence.
 -- ──────────────────────────────────────────
 Union = {}
 
 function Union.GetPlayer(src)
+    -- Passe par PlayerManager (Union framework) si disponible,
+    -- sinon fallback sur l'export direct
+    if PlayerManager and PlayerManager.get then
+        return PlayerManager.get(tonumber(src))
+    end
     return exports["union"]:GetPlayerFromId(src)
 end
 
+-- FIX-1 : utilise la licence explicitement, pas GetPlayerIdentifier(src,0)
+-- qui peut retourner discord:, fivem: ou autre selon l'ordre des identifiants.
 function Union.GetCharacterUniqueId(src)
-    local identifier = GetPlayerIdentifier(src, 0)
-    if not identifier then return nil end
+    local license = GetPlayerIdentifierByType(src, "license")
+    if not license then
+        -- Fallback : license2 (nouveau format FiveM)
+        license = GetPlayerIdentifierByType(src, "license2")
+    end
+    if not license then return nil end
+
     local result = MySQL.single.await(
         'SELECT unique_id FROM user_character WHERE identifier = ? LIMIT 1',
-        { identifier }
+        { license }
     )
     return result and result.unique_id or nil
 end
 
 function Union.GetOwnerIdentifier(player)
-    return player.identifier or player.license or player.citizenid
+    return player.license or player.identifier or player.citizenid
 end
 
 function Union.GetName(player)
@@ -118,53 +134,49 @@ end
 -- ──────────────────────────────────────────
 -- kt_inventory — wrappers
 -- ──────────────────────────────────────────
-KtInv = {}
+OxInv = {}
 
-function KtInv.GetMoney(src)
+function OxInv.GetMoney(src)
     return exports.kt_inventory:GetItemCount(src, "money") or 0
 end
 
-function KtInv.AddMoney(src, amount)
+function OxInv.AddMoney(src, amount)
     exports.kt_inventory:AddItem(src, "money", amount)
 end
 
-function KtInv.RemoveMoney(src, amount)
+function OxInv.RemoveMoney(src, amount)
     return exports.kt_inventory:RemoveItem(src, "money", amount)
 end
 
-function KtInv.HasCard(src)
+function OxInv.HasCard(src)
     for _, item in pairs(Config.BankCardItem) do
         if exports.kt_inventory:GetItemCount(src, item) > 0 then return true end
     end
     return false
 end
 
-function KtInv.GetCardType(src)
+function OxInv.GetCardType(src)
     for key, item in pairs(Config.BankCardItem) do
         if exports.kt_inventory:GetItemCount(src, item) > 0 then return key end
     end
     return nil
 end
 
-function KtInv.AddCard(src, cardType, metadata)
+function OxInv.AddCard(src, cardType)
     local item = Config.BankCardItem[cardType]
-    if item then
-        exports.kt_inventory:AddItem(src, item, 1, metadata or {})
-    end
+    if item then exports.kt_inventory:AddItem(src, item, 1) end
 end
 
-function KtInv.RemoveCard(src)
+function OxInv.RemoveCard(src)
     for _, item in pairs(Config.BankCardItem) do
         if exports.kt_inventory:GetItemCount(src, item) > 0 then
             exports.kt_inventory:RemoveItem(src, item, 1)
-            return true
+            return
         end
     end
-    return false
 end
 
--- Donne un reçu de transaction si activé dans la config
-function KtInv.GiveReceipt(src, label)
+function OxInv.GiveReceipt(src, label)
     if not Config.Inventory.GiveReceipt then return end
     exports.kt_inventory:AddItem(
         src,

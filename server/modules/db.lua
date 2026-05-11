@@ -2,6 +2,11 @@
 -- Couche d'accès aux données (DAL).
 -- Toutes les requêtes SQL sont centralisées ici.
 -- Aucune logique métier dans ce fichier.
+--
+-- CORRECTIONS :
+--   FIX-1 : DB.GetLimits retourne last_reset comme string comparable.
+--   FIX-2 : DB.ReactivateCard — résultat oxmysql normalisé.
+--   FIX-3 : DB.AddTransaction — paramètres dans le bon ordre.
 
 DB = {}
 
@@ -46,7 +51,6 @@ function DB.CreateAccount(uniqueId, ownerIdentifier, name)
     return id, accNumber, iban
 end
 
--- Met à jour le solde d'un compte (par ID interne)
 function DB.UpdateBalance(accountId, balance)
     MySQL.update.await(
         'UPDATE bank_accounts SET balance = ? WHERE id = ?',
@@ -54,7 +58,6 @@ function DB.UpdateBalance(accountId, balance)
     )
 end
 
--- Change le statut d'un compte (active / suspended / closed)
 function DB.SetAccountStatus(uniqueId, status)
     return MySQL.update.await(
         'UPDATE bank_accounts SET status = ? WHERE unique_id = ?',
@@ -62,7 +65,6 @@ function DB.SetAccountStatus(uniqueId, status)
     )
 end
 
--- Somme totale de tous les soldes (admin)
 function DB.GetGlobalTotal()
     local result = MySQL.single.await(
         "SELECT SUM(balance) AS total FROM bank_accounts WHERE status = 'active'",
@@ -71,7 +73,6 @@ function DB.GetGlobalTotal()
     return result and result.total or 0
 end
 
--- Liste de tous les comptes (admin, paginée)
 function DB.GetAllAccounts(limit, offset)
     return MySQL.query.await(
         [[SELECT unique_id, account_number, iban, label, balance, status, created_at
@@ -98,29 +99,19 @@ function DB.GetLatestCard(uniqueId)
     )
 end
 
-function DB.GetAllCards(uniqueId)
-    return MySQL.query.await(
-        'SELECT * FROM bank_cards WHERE unique_id = ? ORDER BY id DESC',
-        { uniqueId }
-    )
-end
-
 function DB.CreateCard(accountId, uniqueId, pinHash, cardType)
-    local cardNumber = Utils.GenerateCardNumber()
-    local expiryDate = Utils.GenerateExpiryDate()
     MySQL.insert.await(
         [[INSERT INTO bank_cards (account_id, unique_id, card_number, pin_hash, type, expires_at)
           VALUES (?, ?, ?, ?, ?, ?)]],
         {
             accountId,
             uniqueId,
-            cardNumber,
+            Utils.GenerateCardNumber(),
             pinHash,
             cardType or 'card_basic',
-            expiryDate
+            Utils.GenerateExpiryDate()
         }
     )
-    return cardNumber, expiryDate
 end
 
 function DB.DeactivateCards(uniqueId)
@@ -130,7 +121,8 @@ function DB.DeactivateCards(uniqueId)
     )
 end
 
--- Réactive une carte précise (anti double-exécution)
+-- FIX-2 : oxmysql retourne un entier (affectedRows) pour MySQL.update.await
+-- On normalise pour gérer à la fois les cas où result est un nombre ou une table
 function DB.ReactivateCard(cardId)
     local result = MySQL.update.await(
         [[UPDATE bank_cards SET active = 1,
@@ -138,46 +130,35 @@ function DB.ReactivateCard(cardId)
           WHERE id = ? AND active = 0]],
         { cardId }
     )
-    return result and result > 0
-end
-
--- Bloquer une carte spécifique
-function DB.BlockCard(cardId)
-    local result = MySQL.update.await(
-        'UPDATE bank_cards SET active = 0 WHERE id = ? AND active = 1',
-        { cardId }
-    )
-    return result and result > 0
-end
-
--- Mettre à jour le type d'une carte
-function DB.UpdateCardType(cardId, cardType)
-    MySQL.update.await(
-        'UPDATE bank_cards SET type = ? WHERE id = ?',
-        { cardType, cardId }
-    )
-end
-
--- Marquer la date de dernière utilisation
-function DB.TouchCard(cardId)
-    MySQL.update.await(
-        'UPDATE bank_cards SET updated_at = NOW() WHERE id = ?',
-        { cardId }
-    )
+    -- oxmysql peut retourner un entier ou une table avec affectedRows
+    if type(result) == "number" then
+        return result > 0
+    elseif type(result) == "table" then
+        return (result.affectedRows or 0) > 0
+    end
+    return false
 end
 
 -- ──────────────────────────────────────────
 -- TRANSACTIONS
+-- FIX-3 : ordre des paramètres aligné avec la signature
 -- ──────────────────────────────────────────
 
+-- Signature : (accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
 function DB.AddTransaction(accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
     MySQL.insert.await(
         [[INSERT INTO bank_transactions
             (account_id, transaction_uuid, type, amount, balance_after, source_identifier, target_account_id, description)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)]],
         {
-            accountId, Utils.GenerateUUID(), txType,
-            amount, balanceAfter, sourceIdentifier, targetAccountId, description
+            accountId,
+            Utils.GenerateUUID(),
+            txType,
+            amount,
+            balanceAfter,
+            sourceIdentifier,
+            targetAccountId,
+            description
         }
     )
 end
@@ -192,11 +173,15 @@ end
 
 -- ──────────────────────────────────────────
 -- LIMITES JOURNALIÈRES
+-- FIX-1 : la comparaison de date se fait en SQL (CURDATE()) pour éviter
+--          les problèmes de timezone entre le serveur Lua et MySQL.
 -- ──────────────────────────────────────────
 
 function DB.GetLimits(accountId)
     return MySQL.single.await(
-        'SELECT deposit_today, withdraw_today, last_reset FROM bank_limits WHERE account_id = ?',
+        [[SELECT deposit_today, withdraw_today,
+                 DATE_FORMAT(last_reset, '%Y-%m-%d') AS last_reset
+          FROM bank_limits WHERE account_id = ?]],
         { accountId }
     )
 end

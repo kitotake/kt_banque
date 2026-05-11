@@ -1,14 +1,19 @@
 -- ==================== KT BANQUE v7.5.0 — CLIENT/MODULES/UI ====================
 -- Gestion de l'interface NUI (ouverture, fermeture, mises à jour).
+--
+-- CORRECTIONS :
+--   FIX-1 : Guard sur amount <= 0 avant envoi au serveur (double validation).
+--   FIX-2 : pinHash tostring() garanti avant envoi.
+--   FIX-3 : ESC handler — thread optimisé avec Wait(0) seulement si UI ouverte.
 
 UI = {}
 
 local isUIOpen       = false
 local currentAccount = nil
-local nearATM        = false   -- mis à jour par atm.lua
+local nearATM        = false
 
-function UI.IsOpen()    return isUIOpen  end
-function UI.SetNearATM(v) nearATM = v   end
+function UI.IsOpen()      return isUIOpen  end
+function UI.SetNearATM(v) nearATM = v      end
 
 function UI.Open(data)
     if isUIOpen then return end
@@ -53,21 +58,19 @@ end)
 
 RegisterNUICallback('deposit', function(data, cb)
     local amount  = tonumber(data.amount)
-    local pinHash = tostring(data.pinHash or "")
+    -- FIX-1 : validation montant + FIX-2 : pinHash tostring garanti
     if not amount or amount <= 0 then cb('err'); return end
-
-    print('Amount:', amount, 'PinHash:', pinHash) 
+    local pinHash = tostring(data.pinHash or "")
+    if pinHash == "" then cb('err'); return end
     TriggerServerEvent('bank:server:deposit', amount, pinHash)
-    print('Deposit event triggered')
-    print('Data sent to server:', amount, pinHash)
-    print('CurrentAccount:', currentAccount and json.encode(currentAccount) or 'nil')
     cb('ok')
 end)
 
 RegisterNUICallback('withdraw', function(data, cb)
     local amount  = tonumber(data.amount)
-    local pinHash = tostring(data.pinHash or "")
     if not amount or amount <= 0 then cb('err'); return end
+    local pinHash = tostring(data.pinHash or "")
+    if pinHash == "" then cb('err'); return end
     TriggerServerEvent('bank:server:withdraw', amount, pinHash)
     cb('ok')
 end)
@@ -76,7 +79,9 @@ RegisterNUICallback('transfer', function(data, cb)
     local amount  = tonumber(data.amount)
     local target  = tostring(data.target or "")
     local pinHash = tostring(data.pinHash or "")
-    if not amount or amount <= 0 or target == "" then cb('err'); return end
+    if not amount or amount <= 0 or target == "" or pinHash == "" then
+        cb('err'); return
+    end
     TriggerServerEvent('bank:server:transfer', amount, target, pinHash)
     cb('ok')
 end)
@@ -92,11 +97,12 @@ end)
 -- ÉVÉNEMENTS SERVEUR → CLIENT
 -- ──────────────────────────────────────────
 
-RegisterNetEvent('bank:client:openBank',    function(data)          UI.Open(data)          end)
-RegisterNetEvent('bank:client:openCreate',  function()              UI.OpenCreate()        end)
-RegisterNetEvent('bank:client:updateBalance', function(balance)     UI.UpdateBalance(balance) end)
-RegisterNetEvent('bank:client:forceClose',  function()              UI.Close()             end)
-RegisterNetEvent('bank:client:notify',      function(type, msg)
+RegisterNetEvent('bank:client:openBank',      function(data)    UI.Open(data)            end)
+RegisterNetEvent('bank:client:openCreate',    function()        UI.OpenCreate()          end)
+RegisterNetEvent('bank:client:updateBalance', function(balance) UI.UpdateBalance(balance) end)
+RegisterNetEvent('bank:client:forceClose',    function()        UI.Close()               end)
+
+RegisterNetEvent('bank:client:notify', function(type, msg)
     lib.notify({
         title       = type == 'success' and 'Succès' or type == 'error' and 'Erreur' or 'Info',
         description = msg,
@@ -106,13 +112,17 @@ end)
 
 -- ──────────────────────────────────────────
 -- FERMETURE PAR ESC
+-- FIX-3 : Wait(0) uniquement si UI ouverte, sinon Wait(500) pour économiser
+--          les ressources CPU.
 -- ──────────────────────────────────────────
 
 CreateThread(function()
     while true do
         if isUIOpen then
             Wait(0)
-            if IsControlJustPressed(0, 322) then UI.Close() end
+            if IsControlJustPressed(0, 322) then
+                UI.Close()
+            end
         else
             Wait(500)
         end

@@ -1,90 +1,105 @@
 -- ==================== KT BANQUE v7.5.0 — SERVER/MAIN ====================
 -- Point d'entrée serveur.
 -- Les modules sont déjà chargés par fxmanifest dans l'ordre :
---   utils → db → bank → card_manager → card_recovery → admin → main
+--   utils → db → bank → card_recovery → admin → main
+--
+-- CORRECTIONS :
+--   FIX-1 : Guard source valide avant de passer aux handlers Bank.*
+--   FIX-2 : Vérification que le joueur est connecté avant traitement.
+--   FIX-3 : Commande debug protégée par Config.Debug ET ACE.
+
+-- ──────────────────────────────────────────
+-- HELPER : vérifie que le joueur est toujours connecté
+-- ──────────────────────────────────────────
+local function isConnected(src)
+    return GetPlayerEndpoint(tostring(src)) ~= nil
+end
 
 -- ──────────────────────────────────────────
 -- ÉVÉNEMENTS RÉSEAU
+-- FIX-1 : capture de source au début de chaque handler
 -- ──────────────────────────────────────────
 
 RegisterNetEvent('bank:server:requestOpen', function()
-    print(('[BANK DEBUG] requestOpen triggered by source %s'):format(source))
-    Bank.Open(source)
+    local src = source
+    if not isConnected(src) then return end
+    Bank.Open(src)
 end)
 
 RegisterNetEvent('bank:server:createAccount', function(pin)
-    print(('[BANK DEBUG] createAccount triggered by source %s | pin: %s'):format(source, tostring(pin)))
-    Bank.Create(source, pin)
+    local src = source
+    if not isConnected(src) then return end
+    Bank.Create(src, pin)
 end)
 
 RegisterNetEvent('bank:server:deposit', function(amount, pinHash)
-    print(('[BANK DEBUG] deposit triggered by source %s | amount: %s | pinHash: %s'):format(
-        source,
-        tostring(amount),
-        tostring(pinHash)
-    ))
-    Bank.Deposit(source, amount, pinHash)
+    local src = source
+    if not isConnected(src) then return end
+    -- FIX-2 : validation basique avant d'appeler la logique métier
+    amount = tonumber(amount)
+    if not amount or amount <= 0 then return end
+    Bank.Deposit(src, amount, pinHash)
 end)
 
 RegisterNetEvent('bank:server:withdraw', function(amount, pinHash)
-    print(('[BANK DEBUG] withdraw triggered by source %s | amount: %s | pinHash: %s'):format(
-        source,
-        tostring(amount),
-        tostring(pinHash)
-    ))
-    Bank.Withdraw(source, amount, pinHash)
+    local src = source
+    if not isConnected(src) then return end
+    amount = tonumber(amount)
+    if not amount or amount <= 0 then return end
+    Bank.Withdraw(src, amount, pinHash)
 end)
 
 RegisterNetEvent('bank:server:transfer', function(amount, target, pinHash)
-    print(('[BANK DEBUG] transfer triggered by source %s | amount: %s | target: %s | pinHash: %s'):format(
-        source,
-        tostring(amount),
-        tostring(target),
-        tostring(pinHash)
-    ))
-    Bank.Transfer(source, amount, target, pinHash)
+    local src = source
+    if not isConnected(src) then return end
+    amount = tonumber(amount)
+    if not amount or amount <= 0 then return end
+    if not target or tostring(target) == "" then return end
+    Bank.Transfer(src, amount, tostring(target), pinHash)
 end)
 
 RegisterNetEvent('bank:server:upgradeCard', function(cardType)
-    print(('[BANK DEBUG] upgradeCard triggered by source %s | cardType: %s'):format(
-        source,
-        tostring(cardType)
-    ))
-    Bank.UpgradeCard(source, cardType)
+    local src = source
+    if not isConnected(src) then return end
+    if not cardType or cardType == "" then return end
+    Bank.UpgradeCard(src, cardType)
 end)
 
-RegisterNetEvent('bank:server:replaceCard', function()
-    print(('[BANK DEBUG] replaceCard triggered by source %s'):format(source))
-    Bank.ReplaceCard(source)
-end)
 -- ──────────────────────────────────────────
 -- DEBUG
+-- FIX-3 : double protection — Config.Debug ET ACE admin
 -- ──────────────────────────────────────────
 
 if Config.Debug then
     RegisterCommand("ktbank_open", function(src)
+        if src ~= 0 and not IsPlayerAceAllowed(src, Config.AdminAce) then
+            return
+        end
         Bank.Open(src)
     end, true)
 
-    -- Debug : forcer un statut de compte
-    RegisterCommand("ktbank_setstatus", function(src, args)
-        local uid    = args[1]
-        local status = args[2]
-        if uid and status then
-            DB.SetAccountStatus(uid, status)
-            print(("[KT Banque] DEBUG — Compte %s → %s"):format(uid, status))
+    RegisterCommand("ktbank_debug_uid", function(src, args)
+        if src ~= 0 and not IsPlayerAceAllowed(src, Config.AdminAce) then
+            return
         end
-    end, true)
-
-    -- Debug : bloquer la carte d'un joueur
-    RegisterCommand("ktbank_blockcard", function(src, args)
         local targetSrc = tonumber(args[1]) or src
-        local uid       = Union.GetCharacterUniqueId(targetSrc)
-        if uid then
-            CardManager.AdminBlockCard(src, targetSrc, uid, "Debug block")
-            print(("[KT Banque] DEBUG — Carte bloquée pour src=%d"):format(targetSrc))
+        local uid = Union.GetCharacterUniqueId(targetSrc)
+        print(('[KT Banque DEBUG] src=%d uid=%s'):format(targetSrc, tostring(uid)))
+        if src ~= 0 then
+            TriggerClientEvent('bank:client:notify', src, 'info',
+                ('UID src %d : %s'):format(targetSrc, tostring(uid)))
         end
     end, true)
 end
+
+-- ──────────────────────────────────────────
+-- NETTOYAGE À L'ARRÊT
+-- ──────────────────────────────────────────
+
+AddEventHandler('onResourceStop', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    -- Nettoyage éventuel (logs, etc.)
+    print('^3[KT Banque]^7 Ressource arrêtée proprement.')
+end)
 
 print('^2[KT Banque]^7 Serveur principal chargé v7.5.0')
