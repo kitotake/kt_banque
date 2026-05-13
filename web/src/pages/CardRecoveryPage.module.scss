@@ -1,8 +1,11 @@
-@use '../styles/_tokens.scss' as *;
+@use '../styles/_tokens.scss'as *;
 
 .overlay {
-  position: fixed; inset: 0;
-  display: flex; align-items: center; justify-content: center;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: radial-gradient(ellipse at 50% 60%, rgba($red, 0.04) 0%, transparent 60%);
   animation: fadeIn $t-med ease both;
 }
@@ -15,10 +18,16 @@
   padding: 36px 32px;
   box-shadow: $shadow-card;
   animation: slideUp $t-slow $ease-spring both;
-  position: relative; overflow: hidden;
+  position: relative;
+  overflow: hidden;
 
   &::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
     background: linear-gradient(90deg, transparent, $red, transparent);
   }
 }
@@ -30,23 +39,42 @@
 
 .title {
   font-family: $font-display;
-  font-size: 20px; font-weight: 700;
-  color: $text-1; letter-spacing: -0.3px;
-  margin-top: 14px; margin-bottom: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: $text-1;
+  letter-spacing: -0.3px;
+  margin-top: 14px;
+  margin-bottom: 0;
 }
 
 .status-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 14px; border-radius: 99px;
-  font-size: 12px; font-weight: 700; border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid;
 
-  &--active  { background: $green-dim;  border-color: rgba($green, 0.3); color: $green; }
-  &--blocked { background: $red-dim;    border-color: rgba($red,   0.3); color: $red;   }
+  &--active {
+    background: $green-dim;
+    border-color: rgba($green, 0.3);
+    color: $green;
+  }
+
+  &--blocked {
+    background: $red-dim;
+    border-color: rgba($red, 0.3);
+    color: $red;
+  }
 }
 
 .info-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 12px; margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .info-item {
@@ -54,43 +82,68 @@
   border: 1px solid $border-dim;
   border-radius: $r-md;
   padding: 12px 14px;
-  display: flex; flex-direction: column; gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 
   &__label {
-    font-size: 10px; font-weight: 600;
-    color: $text-3; text-transform: uppercase; letter-spacing: 0.8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: $text-3;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
   }
 
   &__value {
-    font-family: $font-mono; font-size: 13px;
-    color: $text-1; font-weight: 500;
+    font-family: $font-mono;
+    font-size: 13px;
+    color: $text-1;
+    font-weight: 500;
     word-break: break-all;
   }
 }
 
-.recover-block, .active-block {
+.recover-block,
+.active-block {
   margin-bottom: 20px;
 }
 
-.recover-desc, .active-desc {
-  font-size: 13px; color: $text-2;
-  text-align: center; margin-bottom: 16px; line-height: 1.6;
+.recover-desc,
+.active-desc {
+  font-size: 13px;
+  color: $text-2;
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.6;
 
-  strong { color: $text-1; }
+  strong {
+    color: $text-1;
+  }
 }
 
 .error-msg {
-  padding: 10px 14px; border-radius: $r-sm;
-  background: $red-dim; border: 1px solid rgba($red, 0.2);
-  color: $red; font-size: 13px; text-align: center;
+  padding: 10px 14px;
+  border-radius: $r-sm;
+  background: $red-dim;
+  border: 1px solid rgba($red, 0.2);
+  color: $red;
+  font-size: 13px;
+  text-align: center;
   margin-bottom: 12px;
 }
 
 .btn-recover {
-  width: 100%; padding: 14px; border-radius: $r-md; border: none;
+  width: 100%;
+  padding: 14px;
+  border-radius: $r-md;
+  border: none;
   background: linear-gradient(135deg, $green, darken($green, 8%));
-  color: $black; font-family: $font-display; font-size: 14px; font-weight: 700;
-  letter-spacing: 0.3px; cursor: pointer;
+  color: $black;
+  font-family: $font-display;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
   box-shadow: 0 4px 20px $green-glow;
   transition: all $t-fast ease;
 
@@ -98,18 +151,32 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 28px rgba($green, 0.5);
   }
-  &:active { transform: scale(0.98); }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
   &:disabled {
-    opacity: 0.35; cursor: not-allowed;
-    transform: none; box-shadow: none;
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 }
 
 .btn-close {
-  width: 100%; padding: 11px; border-radius: $r-md;
-  border: 1px solid $border-dim; background: transparent;
-  color: $text-2; font-size: 14px; cursor: pointer;
+  width: 100%;
+  padding: 11px;
+  border-radius: $r-md;
+  border: 1px solid $border-dim;
+  background: transparent;
+  color: $text-2;
+  font-size: 14px;
+  cursor: pointer;
   transition: all $t-fast ease;
 
-  &:hover { background: $surface-2; color: $text-1; }
+  &:hover {
+    background: $surface-2;
+    color: $text-1;
+  }
 }

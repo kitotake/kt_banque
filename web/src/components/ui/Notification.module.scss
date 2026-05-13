@@ -1,29 +1,74 @@
-@use '../../styles/_tokens.scss' as *;
+@use '../../styles/_tokens.scss'as *;
 
 .notif-stack {
-  position: fixed; top: 20px; right: 20px;
+  position: fixed;
+  top: 20px;
+  right: 20px;
   z-index: 9999;
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   pointer-events: none;
 }
 
 .notif {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 20px; border-radius: $r-md;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: $r-md;
   border: 1px solid $border-dim;
-  background: $surface-2; backdrop-filter: blur(20px);
+  background: $surface-2;
+  backdrop-filter: blur(20px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  font-family: $font-body; font-size: 14px; font-weight: 500;
+  font-family: $font-body;
+  font-size: 14px;
+  font-weight: 500;
   color: $text-1;
   animation: notifIn $t-fast $ease-spring both;
   pointer-events: all;
-  min-width: 240px; max-width: 360px;
+  min-width: 240px;
+  max-width: 360px;
 
-  &__icon { font-size: 16px; flex-shrink: 0; }
-  &__msg  { flex: 1; line-height: 1.4; }
+  &__icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
 
-  &--success { border-left: 3px solid $green; .notif__icon { color: $green; } }
-  &--error   { border-left: 3px solid $red;   .notif__icon { color: $red;   } }
-  &--warning { border-left: 3px solid $amber; .notif__icon { color: $amber; } }
-  &--info    { border-left: 3px solid $cyan;  .notif__icon { color: $cyan;  } }
+  &__msg {
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  &--success {
+    border-left: 3px solid $green;
+
+    .notif__icon {
+      color: $green;
+    }
+  }
+
+  &--error {
+    border-left: 3px solid $red;
+
+    .notif__icon {
+      color: $red;
+    }
+  }
+
+  &--warning {
+    border-left: 3px solid $amber;
+
+    .notif__icon {
+      color: $amber;
+    }
+  }
+
+  &--info {
+    border-left: 3px solid $cyan;
+
+    .notif__icon {
+      color: $cyan;
+    }
+  }
 }
