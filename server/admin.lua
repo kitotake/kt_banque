@@ -3,10 +3,11 @@
 -- Toutes les actions sont tracées dans bank_logs.
 -- Permission requise : Config.AdminAce (défaut "group.admin")
 --
--- CORRECTIONS :
---   FIX-1 : DB.AddTransaction — paramètres dans le bon ordre (txType avant amount).
---   FIX-2 : exports Transfer — txType 'transfer_out'/'transfer_in' dans le bon ordre.
+-- CORRECTIONS v7.5.0 :
+--   FIX-1 : DB.AddTransaction — paramètres dans le bon ordre.
+--   FIX-2 : exports Transfer — txType 'transfer_out'/'transfer_in' corrigés.
 --   FIX-3 : IsAdmin depuis console (src == 0) autorisé sans ACE check.
+--   FIX-4 : GetAccountByNumber / GetAccountByIBAN utilisés dans Transfer.
 
 local function IsAdmin(src)
     -- FIX-3 : la console (src == 0) est toujours admin
@@ -26,7 +27,6 @@ end
 -- COMMANDES ADMIN
 -- ──────────────────────────────────────────
 
--- /bank_status <uniqueId> <active|suspended|closed>
 RegisterCommand("bank_status", function(src, args)
     if not IsAdmin(src) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
@@ -51,7 +51,6 @@ RegisterCommand("bank_status", function(src, args)
     end
 end, false)
 
--- /bank_addmoney <uniqueId> <montant>
 RegisterCommand("bank_addmoney", function(src, args)
     if not IsAdmin(src) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
@@ -71,14 +70,13 @@ RegisterCommand("bank_addmoney", function(src, args)
 
     local newBalance = acc.balance + amount
     DB.UpdateBalance(acc.id, newBalance)
-    -- FIX-1 : (accountId, sourceId, txType, amount, balanceAfter, targetId, description)
+    -- FIX-1 : signature correcte (accountId, sourceId, txType, amount, balanceAfter, targetId, desc)
     DB.AddTransaction(acc.id, 'admin', 'admin', amount, newBalance, nil,
         ('Admin AddMoney — src=%d'):format(src))
     DB.Log(uid, 'admin_add_money', ('$%d ajouté par admin src=%d'):format(amount, src))
     AdminNotify(src, ('✅ $%d ajouté sur %s (nouveau solde : $%d)'):format(amount, uid, newBalance))
 end, false)
 
--- /bank_removemoney <uniqueId> <montant>
 RegisterCommand("bank_removemoney", function(src, args)
     if not IsAdmin(src) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
@@ -99,14 +97,12 @@ RegisterCommand("bank_removemoney", function(src, args)
 
     local newBalance = acc.balance - amount
     DB.UpdateBalance(acc.id, newBalance)
-    -- FIX-1
     DB.AddTransaction(acc.id, 'admin', 'admin', amount, newBalance, nil,
         ('Admin RemoveMoney — src=%d'):format(src))
     DB.Log(uid, 'admin_remove_money', ('$%d retiré par admin src=%d'):format(amount, src))
     AdminNotify(src, ('✅ $%d retiré de %s (nouveau solde : $%d)'):format(amount, uid, newBalance))
 end, false)
 
--- /bank_info <uniqueId>
 RegisterCommand("bank_info", function(src, args)
     if not IsAdmin(src) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
@@ -124,8 +120,7 @@ RegisterCommand("bank_info", function(src, args)
     AdminNotify(src, info)
 end, false)
 
--- /bank_total
-RegisterCommand("bank_total", function(src, args)
+RegisterCommand("bank_total", function(src)
     if not IsAdmin(src) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
         return
@@ -134,7 +129,6 @@ RegisterCommand("bank_total", function(src, args)
     AdminNotify(src, ('💰 Total en banque : $%d'):format(total))
 end, false)
 
--- /bank_logs <uniqueId> [limit]
 RegisterCommand("bank_logs", function(src, args)
     if not IsAdmin(src) then
         TriggerClientEvent('bank:client:notify', src, 'error', Config.Lang.no_permission)
@@ -202,7 +196,6 @@ exports('AddMoney', function(uniqueId, amount)
     if not acc then return false end
     local newBalance = acc.balance + amount
     DB.UpdateBalance(acc.id, newBalance)
-    -- FIX-1
     DB.AddTransaction(acc.id, 'admin', 'admin', amount, newBalance, nil, 'Admin AddMoney (API)')
     DB.Log(uniqueId, 'api_add_money', tostring(amount))
     return true
@@ -216,13 +209,12 @@ exports('RemoveMoney', function(uniqueId, amount)
     if acc.balance < amount then return false end
     local newBalance = acc.balance - amount
     DB.UpdateBalance(acc.id, newBalance)
-    -- FIX-1
     DB.AddTransaction(acc.id, 'admin', 'admin', amount, newBalance, nil, 'Admin RemoveMoney (API)')
     DB.Log(uniqueId, 'api_remove_money', tostring(amount))
     return true
 end)
 
--- FIX-2 : transfer_out / transfer_in dans le bon ordre avec la bonne signature
+-- FIX-2 : transfer_out / transfer_in dans le bon ordre
 exports('Transfer', function(fromUniqueId, toUniqueId, amount)
     amount = math.floor(tonumber(amount) or 0)
     if amount <= 0 then return false, "Montant invalide" end
@@ -238,14 +230,28 @@ exports('Transfer', function(fromUniqueId, toUniqueId, amount)
     DB.UpdateBalance(fromAcc.id, newFromBalance)
     DB.UpdateBalance(toAcc.id,   newToBalance)
 
-    -- FIX-2 : (accountId, sourceId, txType, amount, balanceAfter, targetAccountId, description)
     DB.AddTransaction(fromAcc.id, 'admin', 'transfer_out', amount, newFromBalance,
         toAcc.id, 'Transfer API')
     DB.AddTransaction(toAcc.id,   'admin', 'transfer_in',  amount, newToBalance,
         fromAcc.id, 'Transfer API')
 
-    DB.Log(fromUniqueId, 'api_transfer', ('%s -> %s : %d'):format(fromUniqueId, toUniqueId, amount))
+    DB.Log(fromUniqueId, 'api_transfer',
+        ('%s -> %s : %d'):format(fromUniqueId, toUniqueId, amount))
     return true, "OK"
+end)
+
+exports('BlockCard', function(uniqueId)
+    local card = DB.GetCard(uniqueId)
+    if not card then return false, "Aucune carte active" end
+    DB.BlockCard(card.id)
+    DB.Log(uniqueId, 'api_card_blocked', ('Carte #%d bloquée via API'):format(card.id))
+    return true, "OK"
+end)
+
+exports('ValidateAccountAccess', function(uniqueId)
+    local acc  = DB.GetAccount(uniqueId)
+    local card = acc and DB.GetCard(uniqueId) or nil
+    return acc ~= nil and card ~= nil and tonumber(card.active) == 1
 end)
 
 print('^2[KT Banque]^7 Admin chargé')

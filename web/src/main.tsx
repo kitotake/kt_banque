@@ -1,4 +1,4 @@
-// ==================== KT BANQUE v7.4.1 - Entry Point ====================
+// ==================== KT BANQUE v7.5.0 - Entry Point ====================
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppProvider } from './store';

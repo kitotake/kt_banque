@@ -1,10 +1,5 @@
 -- ==================== KT BANQUE v7.5.0 — MIGRATION SQL ====================
--- Exécutez ce fichier sur votre base de données existante.
--- Compatible avec le schéma v7.4.x — toutes les modifications sont sûres.
 
--- ============================================
--- COMPTES BANCAIRES (inchangé)
--- ============================================
 CREATE TABLE IF NOT EXISTS `bank_accounts` (
     `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_number`   VARCHAR(12)  NOT NULL,
@@ -17,7 +12,6 @@ CREATE TABLE IF NOT EXISTS `bank_accounts` (
     `status`           ENUM('active','suspended','closed') DEFAULT 'active',
     `created_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_account_number` (`account_number`),
     UNIQUE KEY `uk_unique_id` (`unique_id`),
@@ -25,9 +19,6 @@ CREATE TABLE IF NOT EXISTS `bank_accounts` (
     INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- TRANSACTIONS (inchangé)
--- ============================================
 CREATE TABLE IF NOT EXISTS `bank_transactions` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_id`        INT UNSIGNED NOT NULL,
@@ -39,21 +30,16 @@ CREATE TABLE IF NOT EXISTS `bank_transactions` (
     `source_identifier` VARCHAR(60)  DEFAULT NULL,
     `target_account_id` INT UNSIGNED DEFAULT NULL,
     `created_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_transaction_uuid` (`transaction_uuid`),
     INDEX `idx_account` (`account_id`),
     INDEX `idx_account_date` (`account_id`, `created_at` DESC),
-
     CONSTRAINT `fk_transaction_account`
         FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_transaction_target`
         FOREIGN KEY (`target_account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- CARTES BANCAIRES — v7.5.0 : updated_at ajouté
--- ============================================
 CREATE TABLE IF NOT EXISTS `bank_cards` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_id`  INT UNSIGNED NOT NULL,
@@ -65,47 +51,35 @@ CREATE TABLE IF NOT EXISTS `bank_cards` (
     `expires_at`  DATE         NOT NULL,
     `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     `updated_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_card_number` (`card_number`),
     INDEX `idx_account` (`account_id`),
     INDEX `idx_unique_id` (`unique_id`),
-
     CONSTRAINT `fk_card_account`
         FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Migration : ajouter updated_at si absent (base existante)
 ALTER TABLE `bank_cards`
     ADD COLUMN IF NOT EXISTS `updated_at` TIMESTAMP
         DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         AFTER `created_at`;
 
--- ============================================
--- LIMITES JOURNALIÈRES (inchangé)
--- ============================================
 CREATE TABLE IF NOT EXISTS `bank_limits` (
     `account_id`     INT UNSIGNED NOT NULL,
     `deposit_today`  BIGINT       DEFAULT 0,
     `withdraw_today` BIGINT       DEFAULT 0,
     `last_reset`     DATE         NOT NULL,
-
     PRIMARY KEY (`account_id`),
-
     CONSTRAINT `fk_limit_account`
         FOREIGN KEY (`account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- LOGS D'ADMINISTRATION (inchangé)
--- ============================================
 CREATE TABLE IF NOT EXISTS `bank_logs` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `unique_id`  VARCHAR(36)  NOT NULL,
     `action`     VARCHAR(255) NOT NULL,
     `details`    TEXT         DEFAULT NULL,
     `created_at` TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_unique_id` (`unique_id`),
     INDEX `idx_created_at` (`created_at`)

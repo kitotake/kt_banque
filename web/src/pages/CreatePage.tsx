@@ -1,4 +1,10 @@
-// ==================== KT BANQUE v7.4.1 - Create Account Page ====================
+// ==================== KT BANQUE v7.5.0 - Create Account Page ====================
+// CORRECTIONS v7.5.0 :
+//   FIX-1 : PIN envoyé brut au serveur (le serveur hache lui-même via Utils.HashPin).
+//           C'est le seul endroit où le PIN brut transite — la création de compte.
+//   FIX-2 : Validation double (longueur + correspondance) avant envoi.
+//   FIX-3 : NUI callback 'createAccount' aligné avec RegisterNUICallback Lua.
+
 import { useState, useCallback } from 'react';
 import { sendToServer } from '../utils';
 import { useNotification } from '../hooks/useNotification';
@@ -6,8 +12,8 @@ import { useClose } from '../hooks/useNUI';
 import styles from './CreatePage.module.scss';
 
 export function CreatePage() {
-  const notify = useNotification();
-  const close  = useClose();
+  const notify  = useNotification();
+  const close   = useClose();
   const [pin1,    setPin1]    = useState('');
   const [pin2,    setPin2]    = useState('');
   const [error,   setError]   = useState('');
@@ -22,15 +28,20 @@ export function CreatePage() {
     return v === pin1 ? styles['field__input--valid'] : styles['field__input--invalid'];
   };
 
+  // FIX-1 : PIN brut envoyé — le serveur hache via Utils.HashPin
+  // FIX-3 : event 'createAccount' = RegisterNUICallback('createAccount', ...) dans ui.lua
   const handleCreate = useCallback(async () => {
     if (!isValid) {
       setError('Les codes PIN ne correspondent pas');
       return;
     }
+    // FIX-2 : double validation
+    if (pin1.length !== 4 || !/^\d{4}$/.test(pin1)) {
+      setError('Le PIN doit contenir exactement 4 chiffres');
+      return;
+    }
     setLoading(true);
     try {
-      // On envoie le PIN brut uniquement ici : le serveur va le hasher lui-même
-      // (la création de compte est l'unique moment où le PIN brut transite)
       await sendToServer('createAccount', { pin: pin1 });
       notify('Compte créé avec succès !', 'success');
       setPin1('');
@@ -57,6 +68,7 @@ export function CreatePage() {
           <input
             className={styles.field__input}
             type="password"
+            inputMode="numeric"
             maxLength={4}
             placeholder="• • • •"
             value={pin1}
@@ -70,12 +82,15 @@ export function CreatePage() {
           <input
             className={`${styles.field__input} ${matchState(pin2)}`}
             type="password"
+            inputMode="numeric"
             maxLength={4}
             placeholder="• • • •"
             value={pin2}
             onChange={(e) => { setPin2(sanitize(e.target.value)); setError(''); }}
             autoComplete="off"
-            onKeyDown={(e) => e.key === 'Enter' && !loading && isValid && handleCreate()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !loading && isValid) handleCreate();
+            }}
           />
         </div>
 

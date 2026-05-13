@@ -3,10 +3,12 @@
 -- Toutes les requêtes SQL sont centralisées ici.
 -- Aucune logique métier dans ce fichier.
 --
--- CORRECTIONS :
---   FIX-1 : DB.GetLimits retourne last_reset comme string comparable.
---   FIX-2 : DB.ReactivateCard — résultat oxmysql normalisé.
+-- CORRECTIONS v7.5.0 :
+--   FIX-1 : DB.GetLimits retourne last_reset comme string comparable (DATE_FORMAT).
+--   FIX-2 : DB.ReactivateCard — résultat oxmysql normalisé (number ou table).
 --   FIX-3 : DB.AddTransaction — paramètres dans le bon ordre.
+--   FIX-4 : DB.BlockCard ajouté (manquait, utilisé par card_recovery).
+--   FIX-5 : DB.GetAccountByIBAN ajouté (utile pour les virements par IBAN).
 
 DB = {}
 
@@ -25,6 +27,14 @@ function DB.GetAccountByNumber(accountNumber)
     return MySQL.single.await(
         'SELECT * FROM bank_accounts WHERE account_number = ? AND status = "active" LIMIT 1',
         { accountNumber }
+    )
+end
+
+-- FIX-5 : recherche par IBAN pour les virements
+function DB.GetAccountByIBAN(iban)
+    return MySQL.single.await(
+        'SELECT * FROM bank_accounts WHERE iban = ? AND status = "active" LIMIT 1',
+        { iban }
     )
 end
 
@@ -121,8 +131,15 @@ function DB.DeactivateCards(uniqueId)
     )
 end
 
--- FIX-2 : oxmysql retourne un entier (affectedRows) pour MySQL.update.await
--- On normalise pour gérer à la fois les cas où result est un nombre ou une table
+-- FIX-4 : DB.BlockCard — bloque une carte par son id (active → 0)
+function DB.BlockCard(cardId)
+    MySQL.update.await(
+        'UPDATE bank_cards SET active = 0 WHERE id = ?',
+        { cardId }
+    )
+end
+
+-- FIX-2 : oxmysql peut retourner un entier ou une table avec affectedRows
 function DB.ReactivateCard(cardId)
     local result = MySQL.update.await(
         [[UPDATE bank_cards SET active = 1,
@@ -130,7 +147,6 @@ function DB.ReactivateCard(cardId)
           WHERE id = ? AND active = 0]],
         { cardId }
     )
-    -- oxmysql peut retourner un entier ou une table avec affectedRows
     if type(result) == "number" then
         return result > 0
     elseif type(result) == "table" then
@@ -139,12 +155,20 @@ function DB.ReactivateCard(cardId)
     return false
 end
 
+-- Mise à jour du type de carte (upgrade)
+function DB.UpdateCardType(uniqueId, cardType)
+    MySQL.update.await(
+        'UPDATE bank_cards SET type = ? WHERE unique_id = ? AND active = 1',
+        { cardType, uniqueId }
+    )
+end
+
 -- ──────────────────────────────────────────
 -- TRANSACTIONS
 -- FIX-3 : ordre des paramètres aligné avec la signature
+-- Signature : (accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
 -- ──────────────────────────────────────────
 
--- Signature : (accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
 function DB.AddTransaction(accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
     MySQL.insert.await(
         [[INSERT INTO bank_transactions
@@ -173,8 +197,7 @@ end
 
 -- ──────────────────────────────────────────
 -- LIMITES JOURNALIÈRES
--- FIX-1 : la comparaison de date se fait en SQL (CURDATE()) pour éviter
---          les problèmes de timezone entre le serveur Lua et MySQL.
+-- FIX-1 : comparaison de date en SQL (CURDATE()) pour éviter les pb de timezone
 -- ──────────────────────────────────────────
 
 function DB.GetLimits(accountId)

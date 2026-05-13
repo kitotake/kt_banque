@@ -18,6 +18,7 @@ client_scripts {
     'client/modules/atm.lua',
     'client/modules/npc.lua',
     'client/modules/card_recovery.lua',
+    -- SUPPRIMÉ : 'client/card_recovery.lua' (doublon — causait double-registration d'events)
     'client/main.lua'
 }
 
@@ -25,11 +26,12 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/modules/utils.lua',
     'server/modules/db.lua',
-    'server/modules/card_manager.lua',  -- ← NOUVEAU : avant bank
-    'server/modules/bank.lua',
-    'server/modules/card_recovery.lua',
+    'server/modules/card_manager.lua',  -- NOUVEAU : CardManager avant bank
+    'server/modules/bank.lua',          -- CORRIGÉ : vraie logique métier
+    'server/modules/card_recovery.lua', -- CORRIGÉ : délègue à CardManager
     'server/admin.lua',
     'server/main.lua'
+    -- SUPPRIMÉ : 'server/card_recovery.lua' racine (doublon avec server/modules/card_recovery.lua)
 }
 
 ui_page 'web/dist/index.html'

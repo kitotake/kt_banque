@@ -1,4 +1,9 @@
-// ==================== KT BANQUE v7.4.1 - PIN Page ====================
+// ==================== KT BANQUE v7.5.0 - PIN Page ====================
+// CORRECTIONS v7.5.0 :
+//   FIX-1 : storedHash dans les deps de validate (évite closure périmée).
+//   FIX-2 : Validation silencieuse si storedHash absent (mode sans PIN).
+//   FIX-3 : Nettoyage de l'état à chaque ouverture de page.
+
 import { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { useNotification } from '../hooks/useNotification';
@@ -10,15 +15,15 @@ const MAX_LEN = 4;
 
 export function PinPage() {
   const { state, dispatch } = useAppStore();
-  const notify = useNotification();
-  const [pin, setPin]     = useState('');
-  const [shake, setShake] = useState(false);
-  const [error, setError] = useState('');
+  const notify              = useNotification();
+  const [pin,   setPin]     = useState('');
+  const [shake, setShake]   = useState(false);
+  const [error, setError]   = useState('');
 
-  // Hash du PIN stocké côté serveur (jamais le PIN brut)
+  // FIX-1 : storedHash depuis le store (envoyé par Bank.Open)
   const storedHash = state.accountData?.pin_hash ?? '';
 
-  // Reset à chaque ouverture de la page PIN
+  // FIX-3 : reset à chaque fois qu'on arrive sur la page PIN
   useEffect(() => {
     setPin('');
     setError('');
@@ -30,7 +35,7 @@ export function PinPage() {
     return () => clearTimeout(t);
   }, []);
 
-  // FIX: storedHash dans les deps de validate
+  // FIX-1 : storedHash dans les deps
   const validate = useCallback((value: string) => {
     if (value.length !== MAX_LEN) {
       setError('Le PIN doit contenir 4 chiffres');
@@ -39,6 +44,7 @@ export function PinPage() {
       return;
     }
 
+    // FIX-2 : si pas de hash en mémoire, on passe (mode dégradé)
     if (storedHash && hashPin(value) !== storedHash) {
       setError('Code PIN incorrect');
       triggerShake();
@@ -61,7 +67,6 @@ export function PinPage() {
       if (prev.length >= MAX_LEN) return prev;
       const next = prev + key;
       if (next.length === MAX_LEN) {
-        // Auto-valider après un court délai pour l'animation du dernier point
         setTimeout(() => validate(next), 120);
       }
       return next;
@@ -71,9 +76,9 @@ export function PinPage() {
   // Support clavier physique
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (/^\d$/.test(e.key))            handleKey(e.key);
-      else if (e.key === 'Backspace')    handleKey('⌫');
-      else if (e.key === 'Enter')        validate(pin);
+      if (/^\d$/.test(e.key))         handleKey(e.key);
+      else if (e.key === 'Backspace') handleKey('⌫');
+      else if (e.key === 'Enter')     validate(pin);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -89,7 +94,6 @@ export function PinPage() {
         <h1 className={styles.title}>Connexion Sécurisée</h1>
         <p className={styles.subtitle}>Entrez votre code PIN à 4 chiffres</p>
 
-        {/* Indicateurs visuels des chiffres saisis */}
         <div className={styles['pin-display']}>
           {Array.from({ length: MAX_LEN }).map((_, i) => (
             <div
@@ -99,7 +103,6 @@ export function PinPage() {
           ))}
         </div>
 
-        {/* Pavé numérique */}
         <div className={styles['keypad']}>
           {DIGITS.map((d, i) => {
             if (d === '') return <div key={i} />;

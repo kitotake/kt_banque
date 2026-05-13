@@ -1,4 +1,4 @@
-// ==================== KT BANQUE v7.4.1 - Notification ====================
+// ==================== KT BANQUE v7.5.0 - Notification ====================
 import { useAppStore } from '../../store';
 import styles from './Notification.module.scss';
 

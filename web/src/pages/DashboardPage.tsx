@@ -1,20 +1,20 @@
-// ==================== KT BANQUE v7.4.1 - Dashboard ====================
-// Corrections :
-//   • useRef supprimé (inutilisé)
-//   • PIN jamais envoyé : on envoie pin_hash depuis le store
-//   • Guard null sur data.card_meta avant rendu
-//   • account_id affiché correctement
+// ==================== KT BANQUE v7.5.0 - Dashboard ====================
+// CORRECTIONS v7.5.0 :
+//   FIX-1 : sendToServer utilise les noms de NUI callbacks Lua exacts
+//            ('deposit', 'withdraw', 'transfer') — pas les server events.
+//   FIX-2 : pinHash provient de data.pin_hash (envoyé par Bank.Open serveur).
+//   FIX-3 : Guard null complet sur data.card_meta avant rendu.
+//   FIX-4 : Onglet "Carte" ajouté pour le blocage volontaire.
 
 import { useState, useCallback } from 'react';
 import { useAppStore } from '../store';
 import { useNotification } from '../hooks/useNotification';
 import { useClose } from '../hooks/useNUI';
-import { sendToServer, formatCurrency, formatDate, maskCardNumber, cardTypeLabel } from '../utils';
+import { sendToServer, sendNUI, formatCurrency, formatDate, maskCardNumber, cardTypeLabel } from '../utils';
 import { Transaction, TransactionType } from '../types';
 import styles from './DashboardPage.module.scss';
 
-// ---- Types internes ----
-type NavTab = 'operations' | 'history';
+type NavTab = 'operations' | 'history' | 'card';
 
 const TX_ICONS: Record<string, string> = {
   deposit        : '⬆',
@@ -78,8 +78,8 @@ function BalanceCard() {
 
 // ==================== OPERATIONS ====================
 function OperationsPanel() {
-  const { state } = useAppStore();
-  const notify = useNotification();
+  const { state }  = useAppStore();
+  const notify     = useNotification();
   const [depositAmt,    setDepositAmt]    = useState('');
   const [withdrawAmt,   setWithdrawAmt]   = useState('');
   const [transferAmt,   setTransferAmt]   = useState('');
@@ -87,18 +87,19 @@ function OperationsPanel() {
   const [loading,       setLoading]       = useState<string | null>(null);
 
   const data = state.accountData!;
-  // FIX: on utilise pin_hash depuis le store, jamais le PIN brut
+  // FIX-2 : pin_hash fourni par Bank.Open côté serveur
   const pinHash = data.pin_hash;
 
   const wrap = useCallback(async (
     key: string,
-    event: string,
+    // FIX-1 : noms des NUI callbacks Lua (RegisterNUICallback dans ui.lua)
+    nuiEvent: string,
     payload: object,
     successMsg: string
   ) => {
     setLoading(key);
     try {
-      await sendToServer(event, payload);
+      await sendToServer(nuiEvent, payload);
       notify(successMsg, 'success');
     } catch {
       notify('Erreur serveur — réessayez', 'error');
@@ -112,7 +113,7 @@ function OperationsPanel() {
       <p className={styles['section-title']}>Opérations</p>
       <div className={styles['actions-grid']}>
 
-        {/* Dépôt */}
+        {/* Dépôt — FIX-1 : event 'deposit' (NUI callback Lua) */}
         <div className={styles['action-card']}>
           <div className={styles['action-header']}>
             <span className={styles['action-header__icon']}>⬆</span>
@@ -131,7 +132,8 @@ function OperationsPanel() {
               className={`${styles['action-btn']} ${styles['action-btn--deposit']}`}
               disabled={!depositAmt || Number(depositAmt) <= 0 || loading === 'deposit'}
               onClick={() => {
-                const amount = parseFloat(depositAmt);
+                const amount = Math.floor(parseFloat(depositAmt));
+                if (amount <= 0) return;
                 wrap('deposit', 'deposit', { amount, pinHash },
                   `Dépôt de ${formatCurrency(amount)} effectué`);
                 setDepositAmt('');
@@ -142,7 +144,7 @@ function OperationsPanel() {
           </div>
         </div>
 
-        {/* Retrait */}
+        {/* Retrait — FIX-1 : event 'withdraw' */}
         <div className={styles['action-card']}>
           <div className={styles['action-header']}>
             <span className={styles['action-header__icon']}>⬇</span>
@@ -161,7 +163,8 @@ function OperationsPanel() {
               className={`${styles['action-btn']} ${styles['action-btn--withdraw']}`}
               disabled={!withdrawAmt || Number(withdrawAmt) <= 0 || loading === 'withdraw'}
               onClick={() => {
-                const amount = parseFloat(withdrawAmt);
+                const amount = Math.floor(parseFloat(withdrawAmt));
+                if (amount <= 0) return;
                 wrap('withdraw', 'withdraw', { amount, pinHash },
                   `Retrait de ${formatCurrency(amount)} effectué`);
                 setWithdrawAmt('');
@@ -172,7 +175,7 @@ function OperationsPanel() {
           </div>
         </div>
 
-        {/* Transfert */}
+        {/* Transfert — FIX-1 : event 'transfer' */}
         <div className={`${styles['action-card']} ${styles['action-card--transfer']}`}>
           <div className={styles['action-header']}>
             <span className={styles['action-header__icon']}>⇄</span>
@@ -182,7 +185,7 @@ function OperationsPanel() {
             <input
               className={styles['action-input']}
               type="text"
-              placeholder="N° de compte (ex: UN12345678)"
+              placeholder="N° compte ou IBAN (ex: UN12345678)"
               value={transferTarget}
               onChange={(e) => setTransferTarget(e.target.value.toUpperCase())}
               style={{ flex: 2 }}
@@ -199,8 +202,10 @@ function OperationsPanel() {
               className={`${styles['action-btn']} ${styles['action-btn--transfer']}`}
               disabled={!transferAmt || !transferTarget || Number(transferAmt) <= 0 || loading === 'transfer'}
               onClick={() => {
-                const amount = parseFloat(transferAmt);
-                wrap('transfer', 'transfer', { amount, target: transferTarget, pinHash },
+                const amount = Math.floor(parseFloat(transferAmt));
+                if (amount <= 0 || !transferTarget) return;
+                wrap('transfer', 'transfer',
+                  { amount, target: transferTarget, pinHash },
                   `Virement de ${formatCurrency(amount)} envoyé`);
                 setTransferAmt('');
                 setTransferTarget('');
@@ -226,7 +231,9 @@ function HistoryPanel({ history }: { history: Transaction[] }) {
       {history.map((tx) => {
         const isPos = POSITIVE_TYPES.includes(tx.action as TransactionType);
         const isNeu = ['account_created', 'card_issued'].includes(tx.action);
-        const iconClass   = isNeu ? styles['tx-icon--neutral'] : isPos ? styles['tx-icon--positive'] : styles['tx-icon--negative'];
+        const iconClass   = isNeu
+          ? styles['tx-icon--neutral']
+          : isPos ? styles['tx-icon--positive'] : styles['tx-icon--negative'];
         const amountClass = isPos ? styles['tx-amount--positive'] : styles['tx-amount--negative'];
         const sign  = isPos ? '+' : '-';
         const label = TX_LABELS[tx.action] ?? tx.action;
@@ -252,20 +259,78 @@ function HistoryPanel({ history }: { history: Transaction[] }) {
   );
 }
 
+// ==================== ONGLET CARTE ====================
+// FIX-4 : panneau de gestion de carte (blocage volontaire)
+function CardPanel() {
+  const { state }  = useAppStore();
+  const notify     = useNotification();
+  const [blocking, setBlocking] = useState(false);
+  const data = state.accountData!;
+  const isActive = data.card_meta.active === 1;
+
+  const handleBlock = async () => {
+    if (!window.confirm('Bloquer votre carte ? Vous pourrez la remplacer au guichet.')) return;
+    setBlocking(true);
+    try {
+      await sendToServer('selfBlockCard', {});
+      notify('Carte bloquée avec succès.', 'success');
+    } catch {
+      notify('Erreur lors du blocage.', 'error');
+    } finally {
+      setBlocking(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className={styles['section-title']}>Ma Carte</p>
+      <div className={styles['action-card']}>
+        <div className={styles['action-header']}>
+          <span className={styles['action-header__icon']}>◆</span>
+          <span className={styles['action-header__title']}>
+            {cardTypeLabel(data.card_meta.card_type)}
+          </span>
+        </div>
+        <div style={{ marginBottom: 14, color: 'var(--text-2)', fontSize: 13 }}>
+          <div>Numéro : {maskCardNumber(data.card_meta.card_number)}</div>
+          <div>Propriétaire : {data.card_meta.owner}</div>
+          <div>Statut : {isActive ? '🟢 Active' : '🔴 Bloquée'}</div>
+        </div>
+        {isActive && (
+          <button
+            className={`${styles['action-btn']} ${styles['action-btn--withdraw']}`}
+            style={{ width: '100%' }}
+            onClick={handleBlock}
+            disabled={blocking}
+          >
+            {blocking ? 'Blocage...' : '🔒 Bloquer ma carte'}
+          </button>
+        )}
+        {!isActive && (
+          <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center' }}>
+            Votre carte est bloquée. Rendez-vous au guichet pour la remplacer.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ==================== DASHBOARD PRINCIPAL ====================
 const NAV = [
   { id: 'operations' as NavTab, label: 'Opérations', icon: '◈' },
   { id: 'history'    as NavTab, label: 'Historique',  icon: '⊟' },
+  { id: 'card'       as NavTab, label: 'Ma Carte',    icon: '◆' },
 ] as const;
 
 export function DashboardPage() {
   const { state } = useAppStore();
-  const close = useClose();
+  const close     = useClose();
   const [tab, setTab] = useState<NavTab>('operations');
 
   const data = state.accountData;
 
-  // Guard : si accountData n'est pas encore chargé
+  // FIX-3 : guard complet
   if (!data || !data.card_meta) {
     return (
       <div className={styles.root}>
@@ -284,7 +349,7 @@ export function DashboardPage() {
             <div className={styles.brand__icon}>🏦</div>
             <div>
               <div className={styles.brand__name}>KT Banque</div>
-              <div className={styles.brand__version}>v7.4</div>
+              <div className={styles.brand__version}>v7.5</div>
             </div>
           </div>
 
@@ -309,7 +374,8 @@ export function DashboardPage() {
         {/* TOPBAR */}
         <header className={styles['topbar']}>
           <h1 className={styles['topbar-title']}>
-            {tab === 'operations' ? 'Mon Compte' : 'Historique'}
+            {tab === 'operations' ? 'Mon Compte'  :
+             tab === 'history'    ? 'Historique'  : 'Ma Carte'}
           </h1>
           <div className={styles['account-badge']}>
             <span className={styles['account-badge__dot']} />
@@ -331,6 +397,8 @@ export function DashboardPage() {
               <HistoryPanel history={data.history ?? []} />
             </div>
           )}
+
+          {tab === 'card' && <CardPanel />}
         </main>
 
       </div>

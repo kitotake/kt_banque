@@ -1,10 +1,11 @@
 -- ==================== KT BANQUE v7.5.0 — CLIENT/MODULES/UI ====================
 -- Gestion de l'interface NUI (ouverture, fermeture, mises à jour).
 --
--- CORRECTIONS :
+-- CORRECTIONS v7.5.0 :
 --   FIX-1 : Guard sur amount <= 0 avant envoi au serveur (double validation).
 --   FIX-2 : pinHash tostring() garanti avant envoi.
---   FIX-3 : ESC handler — thread optimisé avec Wait(0) seulement si UI ouverte.
+--   FIX-3 : ESC handler — Wait(0) seulement si UI ouverte (CPU).
+--   FIX-4 : selfBlockCard NUI callback ajouté (manquait).
 
 UI = {}
 
@@ -12,8 +13,8 @@ local isUIOpen       = false
 local currentAccount = nil
 local nearATM        = false
 
-function UI.IsOpen()      return isUIOpen  end
-function UI.SetNearATM(v) nearATM = v      end
+function UI.IsOpen()       return isUIOpen end
+function UI.SetNearATM(v)  nearATM = v     end
 
 function UI.Open(data)
     if isUIOpen then return end
@@ -44,7 +45,7 @@ function UI.Close()
 end
 
 function UI.UpdateBalance(balance)
-    SendNUIMessage({ action = 'updateBalance', data = balance })
+    SendNUIMessage({ action = 'updateBalance', balance = balance })
     if currentAccount then currentAccount.balance = balance end
 end
 
@@ -58,8 +59,9 @@ end)
 
 RegisterNUICallback('deposit', function(data, cb)
     local amount  = tonumber(data.amount)
-    -- FIX-1 : validation montant + FIX-2 : pinHash tostring garanti
+    -- FIX-1 : validation montant
     if not amount or amount <= 0 then cb('err'); return end
+    -- FIX-2 : pinHash tostring garanti
     local pinHash = tostring(data.pinHash or "")
     if pinHash == "" then cb('err'); return end
     TriggerServerEvent('bank:server:deposit', amount, pinHash)
@@ -93,18 +95,26 @@ RegisterNUICallback('createAccount', function(data, cb)
     cb('ok')
 end)
 
+-- FIX-4 : blocage volontaire de carte depuis l'UI web
+RegisterNUICallback('selfBlockCard', function(_, cb)
+    TriggerServerEvent('kt_banque:card:selfBlock')
+    cb('ok')
+end)
+
 -- ──────────────────────────────────────────
 -- ÉVÉNEMENTS SERVEUR → CLIENT
 -- ──────────────────────────────────────────
 
-RegisterNetEvent('bank:client:openBank',      function(data)    UI.Open(data)            end)
-RegisterNetEvent('bank:client:openCreate',    function()        UI.OpenCreate()          end)
-RegisterNetEvent('bank:client:updateBalance', function(balance) UI.UpdateBalance(balance) end)
-RegisterNetEvent('bank:client:forceClose',    function()        UI.Close()               end)
+RegisterNetEvent('bank:client:openBank',      function(data)    UI.Open(data)             end)
+RegisterNetEvent('bank:client:openCreate',    function()        UI.OpenCreate()           end)
+RegisterNetEvent('bank:client:updateBalance', function(balance) UI.UpdateBalance(balance)  end)
+RegisterNetEvent('bank:client:forceClose',    function()        UI.Close()                end)
 
 RegisterNetEvent('bank:client:notify', function(type, msg)
     lib.notify({
-        title       = type == 'success' and 'Succès' or type == 'error' and 'Erreur' or 'Info',
+        title       = type == 'success' and 'Succès'
+                   or type == 'error'   and 'Erreur'
+                   or 'Info',
         description = msg,
         type        = type
     })
@@ -112,8 +122,7 @@ end)
 
 -- ──────────────────────────────────────────
 -- FERMETURE PAR ESC
--- FIX-3 : Wait(0) uniquement si UI ouverte, sinon Wait(500) pour économiser
---          les ressources CPU.
+-- FIX-3 : Wait(0) uniquement si UI ouverte
 -- ──────────────────────────────────────────
 
 CreateThread(function()

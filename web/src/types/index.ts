@@ -1,5 +1,9 @@
-// ==================== KT BANQUE v7.4.1 - TYPES ====================
-// FIX: CardType aligné avec config.lua (card_basic / card_gold / card_diamond)
+// ==================== KT BANQUE v7.5.0 - TYPES ====================
+// CORRECTIONS v7.5.0 :
+//   FIX-1 : CardType aligné avec config.lua (card_basic / card_gold / card_diamond).
+//   FIX-2 : AccountData — pin_hash explicitement requis (envoyé par le serveur).
+//   FIX-3 : NUIMessage étendu (showCardStatus, cardRecoverFailed, cardRecoverSuccess).
+//   FIX-4 : CardStatus ajouté pour le composant CardRecovery.
 
 export type CardType = 'card_basic' | 'card_gold' | 'card_diamond';
 
@@ -13,7 +17,7 @@ export type TransactionType =
   | 'admin';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
-export type AppPage = 'pin' | 'create' | 'dashboard';
+export type AppPage = 'pin' | 'create' | 'dashboard' | 'card_recovery';
 
 export interface CardMeta {
   id: number;
@@ -45,10 +49,11 @@ export interface Transaction {
   date: string;
 }
 
+// FIX-2 : pin_hash requis — envoyé par Bank.Open côté serveur
 export interface AccountData {
   account_id: string;
   balance: number;
-  /** Hash du PIN — jamais le PIN brut */
+  /** Hash SHA-like du PIN — jamais le PIN brut */
   pin_hash: string;
   requiresPin: boolean;
   card_meta: CardMeta;
@@ -57,10 +62,38 @@ export interface AccountData {
   history: Transaction[];
 }
 
+// FIX-4 : statut carte pour le composant CardRecovery
+export interface CardStatus {
+  status: 'active' | 'blocked';
+  accountNumber: string;
+  balance: number;
+  recoveryCost: number;
+  expires_at: string;
+  meta_blocked?: boolean;
+  meta_owner?: string;
+}
+
+// FIX-3 : NUIMessage complet
+export type NUIAction =
+  | 'openBank'
+  | 'openCreate'
+  | 'updateBalance'
+  | 'close'
+  | 'showCardStatus'
+  | 'cardRecoverFailed'
+  | 'cardRecoverSuccess';
+
 export interface NUIMessage {
-  action: 'openBank' | 'openCreate' | 'updateBalance' | 'close';
-  data?: AccountData | number;
+  action: NUIAction;
+  data?: AccountData | number | CardStatus;
   balance?: number;
+  status?: string;
+  accountNumber?: string;
+  recoveryCost?: number;
+  expires_at?: string;
+  reason?: string;
+  meta_blocked?: boolean;
+  meta_owner?: string;
 }
 
 export interface NUIPayload {

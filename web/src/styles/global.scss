@@ -25,7 +25,10 @@ html, body {
 
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: $border-dim; border-radius: 99px; &:hover { background: $surface-4; } }
+::-webkit-scrollbar-thumb {
+  background: $border-dim; border-radius: 99px;
+  &:hover { background: $surface-4; }
+}
 
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }

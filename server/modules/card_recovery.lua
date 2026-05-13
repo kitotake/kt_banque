@@ -1,8 +1,12 @@
 -- ==================== KT BANQUE v7.5.0 — SERVER/MODULES/CARD_RECOVERY ====================
--- Gestion de la récupération de carte bloquée.
--- Utilise CardManager pour la logique de remplacement.
-
-local RECOVERY_COST = Config and Config.CardReplaceCost or 1000
+-- Gestion de la récupération / remplacement de carte bloquée.
+-- Utilise CardManager.ReplaceBlockedCard pour toute la logique.
+--
+-- CORRECTIONS v7.5.0 :
+--   FIX-1 : Délégation complète à CardManager.ReplaceBlockedCard (plus de logique dupliquée).
+--   FIX-2 : TriggerClientEvent("kt_banque:card:checkStatus") — ajout du src manquant.
+--   FIX-3 : Suppression de la dépendance à Logger:info (non défini) → print conditionnel.
+--   FIX-4 : selfBlock notifie correctement le client avec le src.
 
 -- ──────────────────────────────────────────
 -- RÉCUPÉRER / REMPLACER LA CARTE
@@ -30,7 +34,7 @@ RegisterNetEvent("kt_banque:card:recover", function()
         return
     end
 
-    -- Déléguer à CardManager.ReplaceBlockedCard
+    -- Déléguer à CardManager
     local ok, result = CardManager.ReplaceBlockedCard(src, uid)
 
     if not ok then
@@ -39,11 +43,13 @@ RegisterNetEvent("kt_banque:card:recover", function()
     end
 
     TriggerClientEvent("kt_banque:card:recoverResult", src, true)
-    TriggerClientEvent('bank:client:updateBalance', src, result)
 
+    -- FIX-3 : pas de Logger:info — print conditionnel selon Config.Debug
     if Config.Debug then
         print(('[KT Banque] %s a récupéré sa carte ($%d)'):format(
-            player.name or uid, Config.CardReplaceCost or 1000))
+            Union.GetName(player) or uid,
+            Config.CardReplaceCost or 1000
+        ))
     end
 end)
 
@@ -67,14 +73,14 @@ RegisterNetEvent("kt_banque:card:checkStatus", function()
         ORDER BY bc.id DESC LIMIT 1
     ]], { uid })
 
-    -- Enrichir avec les métadonnées inventaire
+    -- Enrichir avec les métadonnées inventaire si disponibles
     if data then
         local physMeta, _ = CardManager.GetPhysicalCardMeta(src)
         if physMeta then
-            data.meta_blocked  = physMeta.blocked  or false
-            data.meta_disabled = physMeta.disabled or false
+            data.meta_blocked  = physMeta.blocked   or false
+            data.meta_disabled = physMeta.disabled  or false
             data.meta_expire   = physMeta.expireDate or nil
-            data.meta_owner    = physMeta.owner or nil
+            data.meta_owner    = physMeta.owner      or nil
         end
     end
 
@@ -83,6 +89,8 @@ end)
 
 -- ──────────────────────────────────────────
 -- BLOCAGE VOLONTAIRE DE CARTE (joueur)
+-- FIX-2 : TriggerClientEvent avec src
+-- FIX-4 : notification correcte avec src
 -- ──────────────────────────────────────────
 
 RegisterNetEvent("kt_banque:card:selfBlock", function()
@@ -94,7 +102,7 @@ RegisterNetEvent("kt_banque:card:selfBlock", function()
     local card = DB.GetCard(uid)
 
     if not card then
-        TriggerClientEvent('bank:client:notify', src, 'error', "Aucune carte active à bloquer")
+        TriggerClientEvent('bank:client:notify', src, 'error', "Aucune carte active à bloquer.")
         return
     end
 
@@ -110,8 +118,11 @@ RegisterNetEvent("kt_banque:card:selfBlock", function()
 
     DB.Log(uid, "card_self_blocked", ("Carte #%d bloquée volontairement"):format(card.id))
 
-    TriggerClientEvent('bank:client:notify', src, 'success', "Carte bloquée. Demandez un remplacement au guichet")
-    TriggerClientEvent("kt_banque:card:checkStatus") -- rafraîchir
+    TriggerClientEvent('bank:client:notify', src, 'success',
+        "Carte bloquée. Demandez un remplacement au guichet.")
+
+    -- FIX-2 : src présent
+    TriggerClientEvent("kt_banque:card:checkStatus", src)
 end)
 
-print('^2[KT Banque]^7 Card recovery (server) chargé')
+print('^2[KT Banque]^7 Card recovery (server module) chargé')

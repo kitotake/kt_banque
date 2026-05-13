@@ -1,16 +1,12 @@
 -- ==================== KT BANQUE v7.5.0 — CONFIG ====================
 Config = {}
 
--- ==================== GÉNÉRAL ====================
-Config.Debug      = false
+Config.Debug       = false
 Config.RequireCard = true
-Config.SpamDelay  = 1000   -- ms entre deux actions (anti-spam)
+Config.SpamDelay   = 1000
 
--- ==================== CARTES : COÛT DE REMPLACEMENT ====================
--- Coût pour remplacer une carte bloquée / volée
 Config.CardReplaceCost = 500
 
--- ==================== ITEMS & TYPES DE CARTES ====================
 Config.BankCardItem = {
     card_basic   = "bank_card",
     card_gold    = "bank_gold_card",
@@ -38,7 +34,6 @@ Config.CardLimits = {
     }
 }
 
--- ==================== BASE DE DONNÉES ====================
 Config.DB = {
     banking_table           = "bank_accounts",
     bank_cards_table        = "bank_cards",
@@ -47,14 +42,12 @@ Config.DB = {
     bank_logs_table         = "bank_logs"
 }
 
--- ==================== INVENTAIRE ====================
 Config.Inventory = {
     GiveReceipt  = true,
     ReceiptItem  = "bank_receipt",
     ReceiptCount = 1
 }
 
--- ==================== PNJ BANQUIERS ====================
 Config.PNJ = {
     Enabled    = true,
     Model      = "cs_bankman",
@@ -66,7 +59,6 @@ Config.PNJ = {
     Label      = "[E] Améliorer carte"
 }
 
--- PNJ remplacement de carte (guichet)
 Config.PNJ_Replace = {
     Enabled    = true,
     Model      = "cs_bankman",
@@ -89,7 +81,6 @@ Config.PNJ2 = {
     Label      = "[E] Ouvrir un compte"
 }
 
--- ==================== ATM ====================
 Config.ATMModels = {
     `prop_atm_01`,
     `prop_atm_02`,
@@ -100,14 +91,12 @@ Config.ATMModels = {
 Config.InteractionDistance = 2.5
 Config.ATMDistance         = 1.5
 
--- ==================== BLIPS ====================
 Config.Blips = {
     { label = "Banque Centrale",         pos = vector3(150.266, -1040.203, 29.374), sprite = 108, color = 2, scale = 0.8 },
     { label = "Banque Pacific Standard", pos = vector3(247.49,  223.15,  106.29),  sprite = 108, color = 2, scale = 0.8 },
     { label = "Banque Legion Square",    pos = vector3(314.18,  -278.62,   54.17),  sprite = 108, color = 2, scale = 0.8 }
 }
 
--- ==================== ANIMATIONS ====================
 Config.Animations = {
     enabled = true,
     dict    = "amb@prop_human_atm@male@enter",
@@ -115,7 +104,6 @@ Config.Animations = {
     flag    = 1
 }
 
--- ==================== ADMIN ====================
 Config.AdminAce = "group.admin"
 
 if Config.Debug then print('^3[KT Banque]^7 Mode DEBUG activé') end

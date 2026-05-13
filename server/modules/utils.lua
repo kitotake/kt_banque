@@ -1,16 +1,18 @@
 -- ==================== KT BANQUE v7.5.0 — SERVER/MODULES/UTILS ====================
--- CORRECTIONS :
+-- CORRECTIONS v7.5.0 :
 --   FIX-1 : Union.GetCharacterUniqueId utilise GetPlayerIdentifierByType("license")
---            au lieu de GetPlayerIdentifier(src,0) qui peut retourner n'importe quel id.
---   FIX-2 : Union.GetPlayer retourne maintenant le player depuis PlayerManager
---            pour être cohérent avec le reste du code.
---   FIX-3 : Utils.CheckSpam nettoyé à playerDropped.
+--            pour éviter de récupérer un identifiant discord:/fivem: par erreur.
+--   FIX-2 : Union.GetPlayer passe par PlayerManager si disponible.
+--   FIX-3 : Utils.CheckSpam nettoyé à playerDropped (pas de fuite mémoire).
+--   FIX-4 : HashPin — commentaire clair sur l'identité avec le JS côté web.
 
 Utils = {}
 
 -- ──────────────────────────────────────────
--- Anti-spam
+-- ANTI-SPAM
+-- FIX-3 : nettoyage à la déconnexion
 -- ──────────────────────────────────────────
+
 local lastAction = {}
 
 function Utils.CheckSpam(src)
@@ -26,8 +28,9 @@ AddEventHandler('playerDropped', function()
 end)
 
 -- ──────────────────────────────────────────
--- Générateurs
+-- GÉNÉRATEURS
 -- ──────────────────────────────────────────
+
 function Utils.GenerateAccountNumber()
     return "UN" .. math.random(10000000, 99999999)
 end
@@ -59,29 +62,29 @@ end
 -- ──────────────────────────────────────────
 -- PIN
 -- ──────────────────────────────────────────
+
 function Utils.ValidatePin(pin)
     local p = tostring(pin or "")
     return #p == 4 and p:match("^%d+$") ~= nil
 end
 
--- Hash PIN — DOIT être identique à web/src/utils/index.ts → hashPin()
--- FIX : utilisation de math.imul simulé pour correspondre exactement au JS
--- JS : hash = (Math.imul(hash, 31) + charCode) >>> 0
--- Lua : (hash * 31 + byte) % (2^32) — identique sur les plages 0..2^32-1
+-- FIX-4 : Hash PIN — DOIT être identique à web/src/utils/index.ts → hashPin()
+-- JS : (Math.imul(hash, 31) + charCode) >>> 0
+-- Lua : (hash * 31 + byte) % (2^32) — identique pour les plages 0..2^32-1
 function Utils.HashPin(pin)
     local hash     = 0
     local salt     = "kt_banque_v7"
     local combined = salt .. tostring(pin)
     for i = 1, #combined do
-        -- Simule Math.imul(hash, 31) >>> 0 + charCode
         hash = (hash * 31 + combined:byte(i)) % 4294967296 -- 2^32
     end
     return string.format("%08x", hash)
 end
 
 -- ──────────────────────────────────────────
--- Logs d'administration
+-- LOGS D'ADMINISTRATION
 -- ──────────────────────────────────────────
+
 function Utils.Log(uniqueId, action, details)
     MySQL.insert.await(
         'INSERT INTO bank_logs (unique_id, action, details) VALUES (?, ?, ?)',
@@ -90,29 +93,25 @@ function Utils.Log(uniqueId, action, details)
 end
 
 -- ──────────────────────────────────────────
--- Framework Union — wrappers légers
--- FIX-1 : utilise GetPlayerIdentifierByType("license") pour garantir
---          de récupérer la licence et non un autre identifiant.
--- FIX-2 : Union.GetPlayer passe par PlayerManager pour cohérence.
+-- FRAMEWORK UNION — WRAPPERS
+-- FIX-1 : utilise GetPlayerIdentifierByType("license") explicitement
+-- FIX-2 : Union.GetPlayer passe par PlayerManager si disponible
 -- ──────────────────────────────────────────
+
 Union = {}
 
 function Union.GetPlayer(src)
-    -- Passe par PlayerManager (Union framework) si disponible,
-    -- sinon fallback sur l'export direct
     if PlayerManager and PlayerManager.get then
         return PlayerManager.get(tonumber(src))
     end
     return exports["union"]:GetPlayerFromId(src)
 end
 
--- FIX-1 : utilise la licence explicitement, pas GetPlayerIdentifier(src,0)
--- qui peut retourner discord:, fivem: ou autre selon l'ordre des identifiants.
+-- FIX-1 : license explicite, pas GetPlayerIdentifier(src, 0)
 function Union.GetCharacterUniqueId(src)
-    local license = GetPlayerIdentifierByType(src, "license")
+    local license = GetPlayerIdentifierByType(tostring(src), "license")
     if not license then
-        -- Fallback : license2 (nouveau format FiveM)
-        license = GetPlayerIdentifierByType(src, "license2")
+        license = GetPlayerIdentifierByType(tostring(src), "license2")
     end
     if not license then return nil end
 
@@ -132,8 +131,9 @@ function Union.GetName(player)
 end
 
 -- ──────────────────────────────────────────
--- kt_inventory — wrappers
+-- KT_INVENTORY — WRAPPERS
 -- ──────────────────────────────────────────
+
 OxInv = {}
 
 function OxInv.GetMoney(src)
@@ -150,14 +150,18 @@ end
 
 function OxInv.HasCard(src)
     for _, item in pairs(Config.BankCardItem) do
-        if exports.kt_inventory:GetItemCount(src, item) > 0 then return true end
+        if (exports.kt_inventory:GetItemCount(src, item) or 0) > 0 then
+            return true
+        end
     end
     return false
 end
 
 function OxInv.GetCardType(src)
     for key, item in pairs(Config.BankCardItem) do
-        if exports.kt_inventory:GetItemCount(src, item) > 0 then return key end
+        if (exports.kt_inventory:GetItemCount(src, item) or 0) > 0 then
+            return key
+        end
     end
     return nil
 end
@@ -169,7 +173,7 @@ end
 
 function OxInv.RemoveCard(src)
     for _, item in pairs(Config.BankCardItem) do
-        if exports.kt_inventory:GetItemCount(src, item) > 0 then
+        if (exports.kt_inventory:GetItemCount(src, item) or 0) > 0 then
             exports.kt_inventory:RemoveItem(src, item, 1)
             return
         end

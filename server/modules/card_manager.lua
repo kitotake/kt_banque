@@ -1,218 +1,163 @@
--- ==================== KT BANQUE v7.5.0 — SERVER/MODULES/DB ====================
--- Couche d'accès aux données (DAL).
--- Toutes les requêtes SQL sont centralisées ici.
--- Aucune logique métier dans ce fichier.
+-- ==================== KT BANQUE v7.5.0 — SERVER/MODULES/CARD_MANAGER ====================
+-- Gestion des cartes physiques : remplacement, métadonnées inventaire.
+-- Ce module est chargé AVANT bank.lua et card_recovery.lua.
 --
--- CORRECTIONS :
---   FIX-1 : DB.GetLimits retourne last_reset comme string comparable.
---   FIX-2 : DB.ReactivateCard — résultat oxmysql normalisé.
---   FIX-3 : DB.AddTransaction — paramètres dans le bon ordre.
+-- CORRECTIONS v7.5.0 :
+--   FIX-1 : Fichier était une copie identique de db.lua — remplacé par le vrai CardManager.
+--   FIX-2 : CardManager.ReplaceBlockedCard implémenté (utilisé par card_recovery).
+--   FIX-3 : CardManager.GetPhysicalCardMeta / UpdateCardMetadata implémentés.
+--   FIX-4 : Rollback automatique si UPDATE conditionnel échoue (anti double-clic).
 
-DB = {}
+CardManager = {}
 
--- ──────────────────────────────────────────
--- COMPTES
--- ──────────────────────────────────────────
-
-function DB.GetAccount(uniqueId)
-    return MySQL.single.await(
-        'SELECT * FROM bank_accounts WHERE unique_id = ? AND status = "active" LIMIT 1',
-        { uniqueId }
-    )
-end
-
-function DB.GetAccountByNumber(accountNumber)
-    return MySQL.single.await(
-        'SELECT * FROM bank_accounts WHERE account_number = ? AND status = "active" LIMIT 1',
-        { accountNumber }
-    )
-end
-
--- Admin : récupère un compte quel que soit son statut
-function DB.GetAccountAny(uniqueId)
-    return MySQL.single.await(
-        'SELECT * FROM bank_accounts WHERE unique_id = ? LIMIT 1',
-        { uniqueId }
-    )
-end
-
-function DB.CreateAccount(uniqueId, ownerIdentifier, name)
-    local accNumber = Utils.GenerateAccountNumber()
-    local iban      = Utils.GenerateIBAN(accNumber)
-    local id = MySQL.insert.await(
-        [[INSERT INTO bank_accounts (account_number, unique_id, owner_identifier, iban, label)
-          VALUES (?, ?, ?, ?, ?)]],
-        { accNumber, uniqueId, ownerIdentifier, iban, name .. "'s Account" }
-    )
-    MySQL.insert.await(
-        'INSERT IGNORE INTO bank_limits (account_id, last_reset) VALUES (?, CURDATE())',
-        { id }
-    )
-    return id, accNumber, iban
-end
-
-function DB.UpdateBalance(accountId, balance)
-    MySQL.update.await(
-        'UPDATE bank_accounts SET balance = ? WHERE id = ?',
-        { balance, accountId }
-    )
-end
-
-function DB.SetAccountStatus(uniqueId, status)
-    return MySQL.update.await(
-        'UPDATE bank_accounts SET status = ? WHERE unique_id = ?',
-        { status, uniqueId }
-    )
-end
-
-function DB.GetGlobalTotal()
-    local result = MySQL.single.await(
-        "SELECT SUM(balance) AS total FROM bank_accounts WHERE status = 'active'",
-        {}
-    )
-    return result and result.total or 0
-end
-
-function DB.GetAllAccounts(limit, offset)
-    return MySQL.query.await(
-        [[SELECT unique_id, account_number, iban, label, balance, status, created_at
-          FROM bank_accounts ORDER BY created_at DESC LIMIT ? OFFSET ?]],
-        { limit or 50, offset or 0 }
-    )
-end
+local REPLACE_COST = Config and Config.CardReplaceCost or 1000
 
 -- ──────────────────────────────────────────
--- CARTES
+-- REMPLACEMENT D'UNE CARTE BLOQUÉE
+-- Débite le solde, réactive la carte (UPDATE conditionnel), donne la carte en inventaire.
+-- Retourne (true, newBalance) ou (false, errorMessage).
 -- ──────────────────────────────────────────
 
-function DB.GetCard(uniqueId)
-    return MySQL.single.await(
-        'SELECT * FROM bank_cards WHERE unique_id = ? AND active = 1 LIMIT 1',
-        { uniqueId }
-    )
-end
-
-function DB.GetLatestCard(uniqueId)
-    return MySQL.single.await(
-        'SELECT * FROM bank_cards WHERE unique_id = ? ORDER BY id DESC LIMIT 1',
-        { uniqueId }
-    )
-end
-
-function DB.CreateCard(accountId, uniqueId, pinHash, cardType)
-    MySQL.insert.await(
-        [[INSERT INTO bank_cards (account_id, unique_id, card_number, pin_hash, type, expires_at)
-          VALUES (?, ?, ?, ?, ?, ?)]],
-        {
-            accountId,
-            uniqueId,
-            Utils.GenerateCardNumber(),
-            pinHash,
-            cardType or 'card_basic',
-            Utils.GenerateExpiryDate()
-        }
-    )
-end
-
-function DB.DeactivateCards(uniqueId)
-    MySQL.update.await(
-        'UPDATE bank_cards SET active = 0 WHERE unique_id = ?',
-        { uniqueId }
-    )
-end
-
--- FIX-2 : oxmysql retourne un entier (affectedRows) pour MySQL.update.await
--- On normalise pour gérer à la fois les cas où result est un nombre ou une table
-function DB.ReactivateCard(cardId)
-    local result = MySQL.update.await(
-        [[UPDATE bank_cards SET active = 1,
-            expires_at = DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
-          WHERE id = ? AND active = 0]],
-        { cardId }
-    )
-    -- oxmysql peut retourner un entier ou une table avec affectedRows
-    if type(result) == "number" then
-        return result > 0
-    elseif type(result) == "table" then
-        return (result.affectedRows or 0) > 0
+function CardManager.ReplaceBlockedCard(src, uniqueId)
+    local acc = DB.GetAccount(uniqueId)
+    if not acc then
+        return false, Config.Lang.no_account
     end
-    return false
+
+    local card = DB.GetLatestCard(uniqueId)
+    if not card then
+        return false, "Aucune carte trouvée."
+    end
+
+    if tonumber(card.active) == 1 then
+        return false, "Votre carte est déjà active."
+    end
+
+    local cost = Config.CardReplaceCost or REPLACE_COST
+    if acc.balance < cost then
+        return false, ("Solde insuffisant ($%d requis, vous avez $%d)"):format(cost, acc.balance)
+    end
+
+    -- Débit
+    local newBalance = acc.balance - cost
+    DB.UpdateBalance(acc.id, newBalance)
+    DB.AddTransaction(acc.id, 'system', 'withdraw', cost, newBalance, nil,
+        'Remplacement carte bancaire')
+
+    -- Réactivation conditionnelle (anti double-exécution)
+    local ok = DB.ReactivateCard(card.id)
+
+    if not ok then
+        -- Rollback : rembourser
+        DB.UpdateBalance(acc.id, acc.balance)
+        DB.AddTransaction(acc.id, 'system', 'deposit', cost, acc.balance, nil,
+            'Rollback remplacement carte')
+        return false, "Erreur lors de la réactivation de la carte."
+    end
+
+    -- Donner la carte physique en inventaire (remplace l'ancienne)
+    OxInv.RemoveCard(src)
+    local cardType = card.type or 'card_basic'
+    OxInv.AddCard(src, cardType)
+
+    -- Mettre à jour les métadonnées de l'item carte
+    CardManager.UpdateCardMetadata(src, uniqueId, {
+        blocked     = false,
+        blockReason = nil,
+        blockedAt   = nil,
+        expireDate  = card.expires_at
+    })
+
+    DB.Log(uniqueId, 'card_replaced',
+        ("Carte #%d réactivée — $%d débité"):format(card.id, cost))
+
+    -- Notifier la balance mise à jour
+    TriggerClientEvent('bank:client:updateBalance', src, newBalance)
+
+    return true, newBalance
 end
 
 -- ──────────────────────────────────────────
--- TRANSACTIONS
--- FIX-3 : ordre des paramètres aligné avec la signature
+-- RÉCUPÉRATION DES MÉTADONNÉES DE LA CARTE PHYSIQUE
+-- Retourne (meta, itemName) ou (nil, nil).
 -- ──────────────────────────────────────────
 
--- Signature : (accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
-function DB.AddTransaction(accountId, sourceIdentifier, txType, amount, balanceAfter, targetAccountId, description)
-    MySQL.insert.await(
-        [[INSERT INTO bank_transactions
-            (account_id, transaction_uuid, type, amount, balance_after, source_identifier, target_account_id, description)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)]],
-        {
-            accountId,
-            Utils.GenerateUUID(),
-            txType,
-            amount,
-            balanceAfter,
-            sourceIdentifier,
-            targetAccountId,
-            description
-        }
-    )
-end
-
-function DB.GetTransactions(accountId, limit)
-    return MySQL.query.await(
-        [[SELECT id, type AS action, amount, balance_after, description, created_at AS date
-          FROM bank_transactions WHERE account_id = ? ORDER BY created_at DESC LIMIT ?]],
-        { accountId, limit or 20 }
-    )
+function CardManager.GetPhysicalCardMeta(src)
+    for key, itemName in pairs(Config.BankCardItem) do
+        local count = exports.kt_inventory:GetItemCount(src, itemName)
+        if count and count > 0 then
+            -- Essayer de récupérer les métadonnées de l'item
+            local ok, meta = pcall(function()
+                return exports.kt_inventory:GetItemMetadata(src, itemName)
+            end)
+            if ok and meta then
+                return meta, itemName
+            end
+            return {}, itemName
+        end
+    end
+    return nil, nil
 end
 
 -- ──────────────────────────────────────────
--- LIMITES JOURNALIÈRES
--- FIX-1 : la comparaison de date se fait en SQL (CURDATE()) pour éviter
---          les problèmes de timezone entre le serveur Lua et MySQL.
+-- MISE À JOUR DES MÉTADONNÉES DE LA CARTE PHYSIQUE
 -- ──────────────────────────────────────────
 
-function DB.GetLimits(accountId)
-    return MySQL.single.await(
-        [[SELECT deposit_today, withdraw_today,
-                 DATE_FORMAT(last_reset, '%Y-%m-%d') AS last_reset
-          FROM bank_limits WHERE account_id = ?]],
-        { accountId }
-    )
-end
+function CardManager.UpdateCardMetadata(src, uniqueId, metaUpdate)
+    for key, itemName in pairs(Config.BankCardItem) do
+        local count = exports.kt_inventory:GetItemCount(src, itemName)
+        if count and count > 0 then
+            local ok, currentMeta = pcall(function()
+                return exports.kt_inventory:GetItemMetadata(src, itemName) or {}
+            end)
+            if not ok then currentMeta = {} end
 
-function DB.UpdateLimits(accountId, depositDelta, withdrawDelta)
-    MySQL.update.await(
-        [[UPDATE bank_limits SET
-            deposit_today  = IF(last_reset < CURDATE(), ?, deposit_today  + ?),
-            withdraw_today = IF(last_reset < CURDATE(), ?, withdraw_today + ?),
-            last_reset     = CURDATE()
-          WHERE account_id = ?]],
-        { depositDelta, depositDelta, withdrawDelta, withdrawDelta, accountId }
-    )
+            local newMeta = {}
+            for k, v in pairs(currentMeta) do newMeta[k] = v end
+            for k, v in pairs(metaUpdate)   do newMeta[k] = v end
+
+            -- Ajouter owner si absent
+            if not newMeta.owner then
+                local player = Union.GetPlayer(src)
+                if player then
+                    newMeta.owner = Union.GetName(player)
+                end
+            end
+            newMeta.uniqueId = uniqueId
+
+            pcall(function()
+                exports.kt_inventory:SetItemMetadata(src, itemName, newMeta)
+            end)
+            return
+        end
+    end
 end
 
 -- ──────────────────────────────────────────
--- LOGS
+-- ÉMISSION D'UNE NOUVELLE CARTE (création de compte)
 -- ──────────────────────────────────────────
 
-function DB.Log(uniqueId, action, details)
-    MySQL.insert.await(
-        'INSERT INTO bank_logs (unique_id, action, details) VALUES (?, ?, ?)',
-        { uniqueId, action, details }
-    )
+function CardManager.IssueCard(src, uniqueId, accountId, pinHash, cardType)
+    cardType = cardType or 'card_basic'
+
+    -- Créer en base
+    DB.CreateCard(accountId, uniqueId, pinHash, cardType)
+
+    -- Donner l'item
+    OxInv.AddCard(src, cardType)
+
+    -- Reçu optionnel
+    OxInv.GiveReceipt(src, "Émission carte " .. cardType)
+
+    local player = Union.GetPlayer(src)
+    local name   = player and Union.GetName(player) or "Inconnu"
+
+    -- Métadonnées initiales
+    CardManager.UpdateCardMetadata(src, uniqueId, {
+        blocked    = false,
+        owner      = name,
+        expireDate = Utils.GenerateExpiryDate()
+    })
 end
 
-function DB.GetLogs(uniqueId, limit)
-    return MySQL.query.await(
-        'SELECT action, details, created_at FROM bank_logs WHERE unique_id = ? ORDER BY created_at DESC LIMIT ?',
-        { uniqueId, limit or 50 }
-    )
-end
-
-print('^2[KT Banque]^7 DB chargé')
+print('^2[KT Banque]^7 CardManager chargé')

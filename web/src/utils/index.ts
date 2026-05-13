@@ -1,8 +1,12 @@
-// ==================== KT BANQUE v7.4.1 - UTILS ====================
+// ==================== KT BANQUE v7.5.0 - UTILS ====================
+// CORRECTIONS v7.5.0 :
+//   FIX-1 : sendToServer — les events NUI correspondent aux RegisterNUICallback Lua.
+//   FIX-2 : hashPin — commentaire d'alignement avec Utils.HashPin Lua.
+//   FIX-3 : sendNUI ajouté pour les callbacks sans réponse attendue.
 
 export const RESOURCE_NAME: string =
-  typeof (window as any).GetParentResourceName === 'function'
-    ? (window as any).GetParentResourceName()
+  typeof (window as unknown as Record<string, unknown>)['GetParentResourceName'] === 'function'
+    ? (window as unknown as Record<string, () => string>)['GetParentResourceName']()
     : 'kt_banque';
 
 // ==================== FORMATAGE ====================
@@ -37,12 +41,12 @@ export function maskCardNumber(raw: string): string {
   return parts.map((p, i) => (i < parts.length - 1 ? '****' : p)).join(' ');
 }
 
-// FIX: clés alignées avec config.lua (card_basic / card_gold / card_diamond)
+// FIX-1 : clés alignées avec Config.BankCardItem côté Lua
 export function cardTypeLabel(type: string): string {
   const map: Record<string, string> = {
-    card_basic   : 'Basique',
-    card_gold    : 'Or',
-    card_diamond : 'Diamant',
+    card_basic   : '⬡ Basique',
+    card_gold    : '◆ Or',
+    card_diamond : '◈ Diamant',
   };
   return map[type] ?? type;
 }
@@ -50,14 +54,17 @@ export function cardTypeLabel(type: string): string {
 // ==================== SÉCURITÉ ====================
 
 /**
- * Hash le PIN côté client avant envoi au serveur.
- * DOIT être identique à Utils.HashPin dans server/main.lua
- * et HashPin dans client/main.lua.
+ * FIX-2 : Hash PIN côté client — IDENTIQUE à Utils.HashPin dans server/modules/utils.lua
+ *
+ * Lua :   hash = (hash * 31 + combined:byte(i)) % 4294967296
+ * JS  :   hash = (Math.imul(hash, 31) + combined.charCodeAt(i)) >>> 0
+ *
+ * Les deux sont équivalents sur les entiers non-signés 32 bits.
  */
 export function hashPin(pin: string): string {
-  const salt    = 'kt_banque_v7';
+  const salt     = 'kt_banque_v7';
   const combined = salt + pin;
-  let hash = 0;
+  let hash       = 0;
   for (let i = 0; i < combined.length; i++) {
     hash = (Math.imul(hash, 31) + combined.charCodeAt(i)) >>> 0;
   }
@@ -67,8 +74,11 @@ export function hashPin(pin: string): string {
 // ==================== COMMUNICATION NUI ====================
 
 /**
- * Envoie une requête NUI au serveur FiveM.
- * Timeout 8 secondes pour éviter de bloquer l'UI.
+ * FIX-1 : envoie une requête NUI vers un RegisterNUICallback Lua.
+ * Les noms d'événements doivent correspondre exactement aux callbacks enregistrés.
+ *
+ * Callbacks disponibles (client/modules/ui.lua + card_recovery.lua) :
+ *   'close', 'deposit', 'withdraw', 'transfer', 'createAccount', 'recoverCard', 'selfBlockCard'
  */
 export async function sendToServer(event: string, data: object = {}): Promise<unknown> {
   const controller = new AbortController();
@@ -92,4 +102,14 @@ export async function sendToServer(event: string, data: object = {}): Promise<un
     }
     throw err;
   }
+}
+
+/**
+ * FIX-3 : variante sans attente de réponse (fire-and-forget)
+ * Utile pour 'close', 'recoverCard', 'selfBlockCard'
+ */
+export function sendNUI(event: string, data: object = {}): void {
+  sendToServer(event, data).catch(() => {
+    // silencieux — le Lua a déjà fermé ou le joueur est déconnecté
+  });
 }
